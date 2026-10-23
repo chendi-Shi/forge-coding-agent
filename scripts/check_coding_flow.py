@@ -33,6 +33,10 @@ async def main():
             return result.json()
 
         project = await post("/projects", {"name": "Artifact review integration", "files": {"app.py": "answer = 41\n"}, "test_command": "python -c \"from pathlib import Path; Path('verification-marker.txt').write_text('side effect'); from app import answer; assert answer == 42\""})
+        await post(f"/projects/{project['id']}/acceptance-suites", {
+            "name": "Controlled acceptance", "files": {"test_answer.py": "def test_answer():\n    from app import answer\n    assert answer == 42\n"},
+            "test_paths": ["test_answer.py"], "minimum_tests": 1,
+        })
 
         async def start(parent=None):
             body = {"project_id": project["id"], "prompt": "Controlled artifact integration test", "engine": "codex"}

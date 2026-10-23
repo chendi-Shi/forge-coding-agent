@@ -75,7 +75,7 @@ async function main() {
   };
   const report = {
     checked_at: new Date().toISOString(), base_url: safeUrl(options.baseUrl),
-    scope: 'Read-only live UI plus isolated mocked Forge create/resume flows; the mocked flows never reach the real API.',
+    scope: 'Read-only live UI plus isolated mocked Forge create/resume and acceptance-policy flows; the mocked flows never reach the real API.',
     asset_source: options.localAssets ? 'local workspace static files' : 'deployed API static files',
     browser: 'Microsoft Edge headless / Playwright', checks: [], tasks: [], screenshots: [],
     browser_errors: [], console_errors: [], failed_requests: [], failed_api_responses: [], blocked_mutations: [],
@@ -210,6 +210,25 @@ async function main() {
     report.checks.at(-1).details = { projects: data.projects.length, tasks: data.tasks.length,
       executor_label: await page.locator('#engine-name').innerText() };
 
+    await check('live_acceptance_policy_metadata_dialog', async () => {
+      const project = data.projects[0];
+      assert(project, 'A project is needed to inspect the policy dialog');
+      await page.locator('#project-select').selectOption(project.id);
+      const response = page.waitForResponse(reply => new URL(reply.url()).pathname === `/api/coding/projects/${project.id}/acceptance-suites`);
+      await page.locator('#acceptance-open').click();
+      const reply = await response;
+      assert.equal(reply.status(), 200);
+      const metadata = await reply.json();
+      assert(Array.isArray(metadata.suites));
+      assert(metadata.suites.every(suite => !('files' in suite) && !('policy' in suite)));
+      await page.locator('#acceptance-dialog').waitFor({state: 'visible'});
+      assert((await page.locator('#acceptance-current').innerText()).includes(project.name));
+      assert.equal(await page.locator('#acceptance-files').getAttribute('accept'), '.py');
+      await page.locator('#acceptance-close').click();
+      await page.locator('#all-tasks').click();
+      return {project_id: project.id, policy_versions: metadata.suites.length, submitted: false};
+    });
+
     await check('forge_is_default_and_codex_baseline_is_selectable', async () => {
       assert.equal(await page.locator('#task-engine').inputValue(), 'forge');
       await page.locator('#task-engine').selectOption('codex');
@@ -263,6 +282,15 @@ async function main() {
         assert.equal(await page.locator('#projects button.active').count(), 1);
         const names = await page.locator('#tasks .task-sub span:first-child').allTextContents();
         assert(names.every((name) => name === project.name));
+        const visibleTasks = data.tasks.filter(task => task.project_id === id);
+        for (const [index, task] of visibleTasks.entries()) {
+          if (!task.verification) continue;
+          const label = task.acceptance_suite_id ? '独立验收' : '项目命令';
+          const outcome = task.verification.exit_code === 0 ? '通过' : '未通过';
+          const row = await page.locator('#tasks .task-row').nth(index).innerText();
+          assert(row.includes(label + outcome), 'Task list mislabels the verification source');
+          if (!task.acceptance_suite_id) assert(!row.includes('独立验收通过'), 'Legacy command result was presented as acceptance proof');
+        }
         results.push({ project_id: id, visible_tasks: expected });
       }
       await page.locator('#all-tasks').click();
@@ -320,7 +348,13 @@ async function main() {
         const headings = await page.locator('#detail-content .test-card h3').allTextContents();
         assert(headings[0].includes(`exit ${task.baseline_test.exit_code}`));
         assert(headings[1].includes('exit 0'));
-        const output = await page.locator('#detail-content .test-card').nth(1).locator('pre').innerText();
+        const verificationLabel = task.acceptance_suite_id ? '独立验收' : '项目命令验证';
+        assert(headings[1].includes(`修改后 · ${verificationLabel}`), 'Test heading mislabels the verification source');
+        if (!task.acceptance_suite_id) {
+          assert((await page.locator('#detail-content').innerText()).includes('此任务未绑定独立验收包，属于项目命令验证。'));
+          assert.equal(await page.locator('#accept-task').isEnabled(), false, 'A legacy command-only result enabled acceptance');
+        }
+        const output = await page.locator('#detail-content .test-card').nth(1).locator('pre').first().innerText();
         assert(output.trim().length > 0, 'Independent test output is empty');
         if (index === 0) {
           assert.equal(await page.evaluate(async () => {
@@ -331,7 +365,8 @@ async function main() {
           await page.locator('#detail-content .test-card').nth(1).scrollIntoViewIfNeeded();
           await screenshot(page, 'studio-tests.png');
         }
-        return { baseline_exit_code: task.baseline_test.exit_code, verification_exit_code: task.verification.exit_code };
+        return { baseline_exit_code: task.baseline_test.exit_code, verification_exit_code: task.verification.exit_code,
+          verification_source: task.acceptance_suite_id ? 'pinned acceptance suite' : 'legacy project command' };
       });
 
       await check(`task_${index + 1}_summary`, async () => {
@@ -398,7 +433,7 @@ async function main() {
     await check('mobile_layout_without_horizontal_overflow', async () => {
       const metrics = await phone.evaluate(() => ({ viewport: innerWidth,
         document_width: document.documentElement.scrollWidth, body_width: document.body.scrollWidth,
-        controls: ['project-select', 'task-engine', 'settings-toggle', 'submit-task'].map((id) => {
+        controls: ['project-select', 'task-engine', 'settings-toggle', 'acceptance-open', 'submit-task'].map((id) => {
           const rect = document.getElementById(id).getBoundingClientRect();
           return { id, left: rect.left, right: rect.right, width: rect.width, height: rect.height };
         }) }));
@@ -556,6 +591,113 @@ async function main() {
           late_action_preserves_current_guard: true, stale_detail_response_discarded: true, untrusted_output_rendered_as_text: true};
       } finally { await fixture.close(); }
     });
+
+    const acceptanceFixture = await browser.newContext({viewport: {width: 1200, height: 900}, locale: 'zh-CN'});
+    acceptanceFixture.setDefaultTimeout(options.timeout);
+    // This context serves workspace assets and fulfills EVERY Coding API call;
+    // the upload below cannot publish a policy on a real project.
+    await localAssets(acceptanceFixture);
+    const policyDigest = 'a'.repeat(64), candidateDigest = 'c'.repeat(64);
+    const policyProject = {id: 'policy-fixture-project', name: 'Acceptance fixture only', version: 2,
+      test_command: 'python -m pytest -q', acceptance_suite_id: 'suite-current'};
+    const policy = {id: 'suite-current', project_id: policyProject.id, name: 'Fixture policy', digest: policyDigest,
+      minimum_tests: 2, created_at: '2026-10-23T08:00:00Z'};
+    const proof = {passed: true, suite_id: policy.id, policy_digest: policyDigest, candidate_digest: candidateDigest,
+      tests: {collected: 2, passed: 2, failed: 0, errors: 0, skipped: 0, xfailed: 0, xpassed: 0}, violations: []};
+    const policyTask = {id: 'policy-valid-proof', project_id: policyProject.id, project_name: policyProject.name, project_version: 2,
+      engine: 'forge', status: 'awaiting_review', checkpoint_revision: 8, workspace_ready: true,
+      prompt: 'Fixture with matching acceptance proof', created_at: policy.created_at, timeout_seconds: 900,
+      test_command: policyProject.test_command, usage: {}, diff: '+answer = 42', summary: 'Fixture only',
+      acceptance_suite_id: policy.id, acceptance_suite_digest: policyDigest,
+      baseline_test: {exit_code: 1, stdout: 'Fixture baseline failure'},
+      verification: {exit_code: 0, stdout: 'Fixture final result', acceptance: proof}};
+    const policyTasks = [
+      {...policyTask, id: 'policy-missing', prompt: 'Fixture without an acceptance suite', acceptance_suite_id: null,
+        acceptance_suite_digest: null, verification: {exit_code: 0, stdout: 'Legacy command passed'}},
+      {...policyTask, id: 'policy-old', prompt: 'Fixture pinned to a replaced policy', acceptance_suite_id: 'suite-old',
+        acceptance_suite_digest: 'b'.repeat(64), verification: {exit_code: 0, stdout: 'Old policy passed',
+          acceptance: {...proof, suite_id: 'suite-old', policy_digest: 'b'.repeat(64)}}},
+      {...policyTask, id: 'policy-proof-mismatch', prompt: 'Fixture with mismatched proof digest',
+        verification: {exit_code: 0, stdout: 'Mismatched proof', acceptance: {...proof, policy_digest: 'f'.repeat(64)}}},
+      policyTask,
+    ];
+    const policySubmissions = [], fixtureRejections = [];
+    await acceptanceFixture.route('**/api/coding/**', async route => {
+      const request = route.request(), pathname = new URL(request.url()).pathname.replace('/api/coding', '');
+      let body;
+      if (request.method() === 'POST' && pathname === `/projects/${policyProject.id}/acceptance-suites`) {
+        policySubmissions.push(request.postDataJSON()); body = policy;
+      } else if (request.method() !== 'GET') {
+        fixtureRejections.push({method: request.method(), path: pathname});
+        return route.fulfill({status: 405, json: {detail: 'Unexpected fixture mutation'}});
+      } else if (pathname === '/status') body = {executor_online: true, executors: [{engine: 'forge', capacity: 2}],
+        capacity: {queue_limit: 100, sandbox_commands: 2}, counts: {awaiting_review: policyTasks.length}};
+      else if (pathname === '/projects') body = {projects: [policyProject]};
+      else if (pathname === '/tasks') body = {tasks: policyTasks};
+      else if (pathname === `/projects/${policyProject.id}/acceptance-suites`) body = {suites: [policy]};
+      else if (pathname.endsWith('/events')) body = {events: []};
+      else if (pathname.endsWith('/tool-operations')) body = {operations: []};
+      else body = policyTasks.find(task => pathname === `/tasks/${task.id}`);
+      await route.fulfill({status: body ? 200 : 404, json: body || {detail: 'Unknown acceptance fixture resource'}});
+    });
+    const policyScreen = await acceptanceFixture.newPage();
+    policyScreen.on('pageerror', error => report.browser_errors.push({surface: 'isolated-acceptance-fixture', error: scrub(error.message)}));
+    try {
+      await signIn(policyScreen);
+      await check('isolated_mock_acceptance_upload_request', async () => {
+        await policyScreen.locator('#project-select').selectOption(policyProject.id);
+        await policyScreen.locator('#acceptance-open').click();
+        await policyScreen.locator('#acceptance-dialog').waitFor({state: 'visible'});
+        await policyScreen.locator('#acceptance-name').fill('  UI fixture regression  ');
+        const files = {'test_contract.py': 'def test_contract():\n    assert 2 + 2 == 4\n',
+          'test_other.py': 'def test_other():\n    assert True\n'};
+        await policyScreen.locator('#acceptance-files').setInputFiles(Object.entries(files).map(([name, content]) =>
+          ({name, mimeType: 'text/x-python', buffer: Buffer.from(content, 'utf8')})));
+        await policyScreen.locator('#acceptance-protected').fill(' tests/test_existing.py \n\n pyproject.toml ');
+        await policyScreen.locator('#acceptance-python-paths').fill(' ., src,  ');
+        await policyScreen.locator('#acceptance-min-tests').fill('2');
+        const submitted = policyScreen.waitForResponse(response => response.request().method() === 'POST'
+          && new URL(response.url()).pathname === `/api/coding/projects/${policyProject.id}/acceptance-suites`);
+        await policyScreen.locator('#acceptance-submit').click();
+        assert.equal((await submitted).status(), 200);
+        await policyScreen.locator('#acceptance-dialog').waitFor({state: 'hidden'});
+        assert.deepEqual(policySubmissions, [{name: 'UI fixture regression', files, test_paths: Object.keys(files),
+          protected_paths: ['tests/test_existing.py', 'pyproject.toml'], python_paths: ['.', 'src'], minimum_tests: 2, timeout_seconds: 120}]);
+        assert.equal(await policyScreen.locator('#acceptance-files').inputValue(), '');
+        return {transport: 'all Coding API calls fulfilled locally', submitted_files: 2, live_mutations: 0};
+      });
+      await check('isolated_mock_acceptance_missing_or_replaced_policy_blocks_accept', async () => {
+        for (const id of ['policy-missing', 'policy-old', 'policy-proof-mismatch']) {
+          await openTask(policyScreen, id, policyTasks);
+          assert.equal(await policyScreen.locator('#accept-task').isVisible(), true);
+          assert.equal(await policyScreen.locator('#accept-task').isEnabled(), false, `Accept enabled for ${id}`);
+          assert((await policyScreen.locator('#accept-task').getAttribute('title')).includes('验收'));
+          await policyScreen.locator('#detail-close').click();
+        }
+        return {missing_suite_disabled: true, replaced_policy_disabled: true, mismatched_proof_disabled: true};
+      });
+      await check('isolated_mock_acceptance_matching_proof_enables_accept', async () => {
+        await openTask(policyScreen, policyTask.id, policyTasks);
+        assert.equal(await policyScreen.locator('#accept-task').isVisible(), true);
+        assert.equal(await policyScreen.locator('#accept-task').isEnabled(), true);
+        // Do not click Accept: enabling is a UI assertion, not backend proof.
+        return {enabled: true, accepted: false, backend_verification_not_bypassed: true};
+      });
+      await check('isolated_mock_acceptance_tests_show_counts_and_digests', async () => {
+        await policyScreen.locator('[data-tab="tests"]').click();
+        const panel = await policyScreen.locator('#detail-content').innerText();
+        assert(panel.includes(policy.id) && panel.includes(policyDigest));
+        assert.equal(await policyScreen.locator('.test-card').count(), 2);
+        const proofText = await policyScreen.locator('.test-card').nth(1).locator('pre').last().innerText();
+        const shown = JSON.parse(proofText);
+        assert.deepEqual(shown.tests, proof.tests);
+        assert.deepEqual(shown.violations, []);
+        assert.equal(shown.candidate_digest, candidateDigest);
+        assert((await policyScreen.locator('.test-card').nth(1).innerText()).includes('受保护文件校验通过'));
+        assert.deepEqual(fixtureRejections, []);
+        return {counts: shown.tests, full_policy_digest_visible: true, full_candidate_digest_visible: true};
+      });
+    } finally { await acceptanceFixture.close(); }
 
     await check('no_mutations_or_javascript_errors', async () => {
       assert.equal(report.blocked_mutations.length, 0, 'UI attempted a mutation during read-only testing');

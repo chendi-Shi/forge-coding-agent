@@ -1,0 +1,24 @@
+{
+  "checked_at": "2026-10-23T10:21:32.014602+00:00",
+  "api_replicas": [
+    {
+      "name": "/agent-backend-aegra-api-2",
+      "healthy": true,
+      "source_files_matched": 34,
+      "source_sha256": "89727c793d3b18a3f2a0c7187696d432ab4896c25f523a90688fc75f876bbb2d",
+      "image": "sha256:c28fc8e662a66d4d5f9f5165321dd50a9e09a23ff532628ea6f56f17baea9670"
+    },
+    {
+      "name": "/agent-backend-aegra-api-1",
+      "healthy": true,
+      "source_files_matched": 34,
+      "source_sha256": "89727c793d3b18a3f2a0c7187696d432ab4896c25f523a90688fc75f876bbb2d",
+      "image": "sha256:c28fc8e662a66d4d5f9f5165321dd50a9e09a23ff532628ea6f56f17baea9670"
+    }
+  ],
+  "sandbox_images": {
+    "agent-backend-sandbox:0.1.0": "sha256:a8fb45256f1441e180d9a7be90ac872a58ce11f9832fee41ca684e27dbc90a81",
+    "agent-backend-broker:0.1.0": "sha256:0eaf8702c9d4269828a7215c3f9d8ee89279b92da88aa14a359209b481fbbc3c"
+  },
+  "credentials_included": false
+}

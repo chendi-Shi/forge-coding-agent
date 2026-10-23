@@ -1,0 +1,390 @@
+{
+  "checked_at": "2026-10-23T10:18:44.411Z",
+  "base_url": "http://127.0.0.1:2026/",
+  "scope": "Read-only live UI plus isolated mocked Forge create/resume and acceptance-policy flows; the mocked flows never reach the real API.",
+  "asset_source": "deployed API static files",
+  "browser": "Microsoft Edge headless / Playwright",
+  "checks": [
+    {
+      "name": "desktop_login_and_workspace",
+      "passed": true,
+      "details": {
+        "projects": 4,
+        "tasks": 7,
+        "executor_label": "执行器离线 · 任务可排队"
+      }
+    },
+    {
+      "name": "live_acceptance_policy_metadata_dialog",
+      "passed": true,
+      "details": {
+        "project_id": "49e4c614-2954-4993-a4ea-f11b208d637e",
+        "policy_versions": 0,
+        "submitted": false
+      }
+    },
+    {
+      "name": "forge_is_default_and_codex_baseline_is_selectable",
+      "passed": true,
+      "details": {
+        "default_engine": "forge",
+        "alternative_engine": "codex",
+        "submitted": false
+      }
+    },
+    {
+      "name": "github_and_zip_import_dialog_without_submission",
+      "passed": true,
+      "details": {
+        "github_fields": true,
+        "zip_fields": true,
+        "submitted": false
+      }
+    },
+    {
+      "name": "completed_real_coding_tasks_available",
+      "passed": true,
+      "details": {
+        "count": 2,
+        "task_ids": [
+          "1b774bc8-2b54-4a25-8491-0a6f07f84e15",
+          "18e68fbb-e7a9-4835-b83d-55ee3f6d6dcb"
+        ]
+      }
+    },
+    {
+      "name": "project_filter",
+      "passed": true,
+      "details": [
+        {
+          "project_id": "49f7f670-9c10-4441-9d39-aa7f42b30b33",
+          "visible_tasks": 4
+        },
+        {
+          "project_id": "49e4c614-2954-4993-a4ea-f11b208d637e",
+          "visible_tasks": 1
+        }
+      ]
+    },
+    {
+      "name": "status_filter",
+      "passed": true,
+      "details": {
+        "awaiting_review": 4
+      }
+    },
+    {
+      "name": "task_1_execution_log",
+      "passed": true,
+      "details": {
+        "events": 42,
+        "command_events": 6
+      }
+    },
+    {
+      "name": "task_1_code_diff",
+      "passed": true,
+      "details": {
+        "lines": 178
+      }
+    },
+    {
+      "name": "task_1_independent_tests",
+      "passed": true,
+      "details": {
+        "baseline_exit_code": 1,
+        "verification_exit_code": 0,
+        "verification_source": "legacy project command"
+      }
+    },
+    {
+      "name": "task_1_summary",
+      "passed": true,
+      "details": {
+        "has_summary": true,
+        "engine": "forge"
+      }
+    },
+    {
+      "name": "task_1_runtime_and_tools",
+      "passed": true,
+      "details": {
+        "engine": "forge",
+        "operations": 6
+      }
+    },
+    {
+      "name": "task_2_execution_log",
+      "passed": true,
+      "details": {
+        "events": 74,
+        "command_events": 12
+      }
+    },
+    {
+      "name": "task_2_code_diff",
+      "passed": true,
+      "details": {
+        "lines": 60
+      }
+    },
+    {
+      "name": "task_2_independent_tests",
+      "passed": true,
+      "details": {
+        "baseline_exit_code": 0,
+        "verification_exit_code": 0,
+        "verification_source": "legacy project command"
+      }
+    },
+    {
+      "name": "task_2_summary",
+      "passed": true,
+      "details": {
+        "has_summary": true,
+        "engine": "forge"
+      }
+    },
+    {
+      "name": "task_2_runtime_and_tools",
+      "passed": true,
+      "details": {
+        "engine": "forge",
+        "operations": 12
+      }
+    },
+    {
+      "name": "live_forge_checkpoint_and_tool_operations",
+      "passed": true,
+      "details": {
+        "task_id": "1b774bc8-2b54-4a25-8491-0a6f07f84e15",
+        "checkpoint_revision": 20,
+        "operations": 6,
+        "mutation": false
+      }
+    },
+    {
+      "name": "logout_clears_session_and_stays_logged_out_after_reload",
+      "passed": true
+    },
+    {
+      "name": "mobile_login_and_project_filter",
+      "passed": true,
+      "details": {
+        "width": 390,
+        "height": 844,
+        "project_id": "49f7f670-9c10-4441-9d39-aa7f42b30b33",
+        "visible_tasks": 4
+      }
+    },
+    {
+      "name": "mobile_layout_without_horizontal_overflow",
+      "passed": true,
+      "details": {
+        "viewport": 390,
+        "document_width": 390,
+        "body_width": 390,
+        "controls": [
+          {
+            "id": "project-select",
+            "left": 40,
+            "right": 190,
+            "width": 150,
+            "height": 35
+          },
+          {
+            "id": "task-engine",
+            "left": 200,
+            "right": 350,
+            "width": 150,
+            "height": 35
+          },
+          {
+            "id": "settings-toggle",
+            "left": 40,
+            "right": 100,
+            "width": 60,
+            "height": 28
+          },
+          {
+            "id": "acceptance-open",
+            "left": 40,
+            "right": 100,
+            "width": 60,
+            "height": 28
+          },
+          {
+            "id": "submit-task",
+            "left": 238,
+            "right": 350,
+            "width": 112,
+            "height": 36
+          }
+        ]
+      }
+    },
+    {
+      "name": "mobile_task_detail_tabs_and_layout",
+      "passed": true,
+      "details": {
+        "task_id": "1b774bc8-2b54-4a25-8491-0a6f07f84e15",
+        "detail_width": 390,
+        "diff_and_tests_visible": true
+      }
+    },
+    {
+      "name": "mobile_import_and_logout_remain_available",
+      "passed": true,
+      "details": {
+        "import_button": true,
+        "logout_button": true
+      }
+    },
+    {
+      "name": "isolated_mock_forge_creation_resume_and_uncertain_operation_guard",
+      "passed": true,
+      "details": {
+        "transport": "all API calls mocked, no live mutations",
+        "default_engine": "forge",
+        "checkpoint_displayed": 12,
+        "resumed_fixture_tasks": 2,
+        "uncertain_resume_disabled": true,
+        "late_action_preserves_current_guard": true,
+        "stale_detail_response_discarded": true,
+        "untrusted_output_rendered_as_text": true
+      }
+    },
+    {
+      "name": "isolated_mock_acceptance_upload_request",
+      "passed": true,
+      "details": {
+        "transport": "all Coding API calls fulfilled locally",
+        "submitted_files": 2,
+        "live_mutations": 0
+      }
+    },
+    {
+      "name": "isolated_mock_acceptance_missing_or_replaced_policy_blocks_accept",
+      "passed": true,
+      "details": {
+        "missing_suite_disabled": true,
+        "replaced_policy_disabled": true,
+        "mismatched_proof_disabled": true
+      }
+    },
+    {
+      "name": "isolated_mock_acceptance_matching_proof_enables_accept",
+      "passed": true,
+      "details": {
+        "enabled": true,
+        "accepted": false,
+        "backend_verification_not_bypassed": true
+      }
+    },
+    {
+      "name": "isolated_mock_acceptance_tests_show_counts_and_digests",
+      "passed": true,
+      "details": {
+        "counts": {
+          "collected": 2,
+          "passed": 2,
+          "failed": 0,
+          "errors": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0
+        },
+        "full_policy_digest_visible": true,
+        "full_candidate_digest_visible": true
+      }
+    },
+    {
+      "name": "no_mutations_or_javascript_errors",
+      "passed": true
+    }
+  ],
+  "tasks": [
+    {
+      "id": "1b774bc8-2b54-4a25-8491-0a6f07f84e15",
+      "project_id": "49f7f670-9c10-4441-9d39-aa7f42b30b33",
+      "status": "awaiting_review",
+      "engine": "forge",
+      "checkpoint_revision": 20,
+      "baseline_exit_code": 1,
+      "verification_exit_code": 0,
+      "has_session_id": false,
+      "diff_characters": 6675
+    },
+    {
+      "id": "18e68fbb-e7a9-4835-b83d-55ee3f6d6dcb",
+      "project_id": "49e4c614-2954-4993-a4ea-f11b208d637e",
+      "status": "awaiting_review",
+      "engine": "forge",
+      "checkpoint_revision": 29,
+      "baseline_exit_code": 0,
+      "verification_exit_code": 0,
+      "has_session_id": false,
+      "diff_characters": 1930
+    }
+  ],
+  "screenshots": [
+    "studio-desktop.png",
+    "studio-detail.png",
+    "studio-tests.png",
+    "studio-forge-runtime.png",
+    "studio-mobile.png",
+    "studio-mobile-detail.png"
+  ],
+  "browser_errors": [],
+  "console_errors": [],
+  "failed_requests": [],
+  "failed_api_responses": [],
+  "blocked_mutations": [],
+  "mobile_layout": {
+    "viewport": 390,
+    "document_width": 390,
+    "body_width": 390,
+    "controls": [
+      {
+        "id": "project-select",
+        "left": 40,
+        "right": 190,
+        "width": 150,
+        "height": 35
+      },
+      {
+        "id": "task-engine",
+        "left": 200,
+        "right": 350,
+        "width": 150,
+        "height": 35
+      },
+      {
+        "id": "settings-toggle",
+        "left": 40,
+        "right": 100,
+        "width": 60,
+        "height": 28
+      },
+      {
+        "id": "acceptance-open",
+        "left": 40,
+        "right": 100,
+        "width": 60,
+        "height": 28
+      },
+      {
+        "id": "submit-task",
+        "left": 238,
+        "right": 350,
+        "width": 112,
+        "height": 36
+      }
+    ]
+  },
+  "mobile_navigation": {
+    "import_button": true,
+    "logout_button": true
+  },
+  "passed": true
+}

@@ -45,6 +45,11 @@ function renderProjects() {
   $("project-select").value = previous || state.project;
   $("project-title").textContent = state.projects.find(p => p.id === state.project)?.name || "全部项目";
   $("all-tasks").classList.toggle("active", !state.project);
+  const currentProject = state.projects.find(p => p.id === state.project);
+  disableByPolicy($("acceptance-open"), !currentProject);
+  $("acceptance-status").textContent = !currentProject ? "选择项目后可配置独立验收包。" : currentProject.acceptance_suite_id
+    ? `已绑定独立验收策略 ${currentProject.acceptance_suite_id.slice(0, 8)} · 新任务固定此版本，修改验收命令不会绕过它。`
+    : "尚未配置独立验收包：可以运行和下载补丁，但不能接受变更。请先配置验收策略。";
 }
 function renderTasks() {
   const tasks = state.tasks.filter(t => (!state.project || t.project_id === state.project) && (state.filter === "all" || (state.filter === "active" ? active.has(t.status) : t.status === state.filter)));
@@ -53,7 +58,10 @@ function renderTasks() {
     const row = node("div", "task-row"); row.tabIndex = 0; row.setAttribute("role", "button");
     const info = node("div"); info.append(node("div", "task-title", task.prompt));
     const sub = node("div", "task-sub"); sub.append(node("span", "", task.project_name), engineBadge(task), node("span", "", `v${task.project_version}`), node("span", "", date(task.created_at)));
-    if (task.verification) sub.append(node("span", "", task.verification.exit_code === 0 ? "✓ 验收通过" : "✕ 验收未通过"));
+    if (task.verification) {
+      const label = task.acceptance_suite_id ? "独立验收" : "项目命令";
+      sub.append(node("span", "", task.verification.exit_code === 0 ? `✓ ${label}通过` : `✕ ${label}未通过`));
+    }
     info.append(sub); const right = node("div", "task-right"); right.append(statusBadge(task), node("span", "", "›"));
     row.append(node("div", "task-icon", task.status === "accepted" ? "✓" : "⌘"), info, right);
     row.onclick = () => openDetail(task.id).catch(e => toast(e.message)); row.onkeydown = e => { if (e.key === "Enter") row.click(); }; $("tasks").append(row);
@@ -100,7 +108,11 @@ async function updateDetail() {
   state.detail = task; state.operations = operations; state.operationsError = operationsError;
   const seen = new Set(state.events.map(event => event.id)); state.events.push(...events.events.filter(event => !seen.has(event.id))); state.events.sort((a, b) => a.id - b.id); if (state.events.length) state.cursor = state.events.at(-1).id;
   $("detail-title").textContent = task.prompt; $("detail-meta").replaceChildren(statusBadge(task), engineBadge(task), node("span", "", `${task.project_name} · v${task.project_version}`), node("span", "checkpoint-label", engineOf(task) === "forge" ? `检查点 r${task.checkpoint_revision || 0}` : date(task.created_at)));
-  $("accept-task").hidden = task.status !== "awaiting_review"; disableByPolicy($("accept-task"), !!task.verification && task.verification.exit_code !== 0);
+  const projectPolicy = state.projects.find(p => p.id === task.project_id)?.acceptance_suite_id;
+  const proof = task.verification?.acceptance;
+  const acceptanceBlocked = !task.acceptance_suite_id || !projectPolicy || !proof?.passed || task.acceptance_suite_id !== projectPolicy || proof.suite_id !== task.acceptance_suite_id || proof.policy_digest !== task.acceptance_suite_digest;
+  $("accept-task").hidden = task.status !== "awaiting_review"; disableByPolicy($("accept-task"), acceptanceBlocked || (!!task.verification && task.verification.exit_code !== 0));
+  $("accept-task").title = acceptanceBlocked ? "独立验收未通过、证据缺失或项目策略已更新；请创建后续任务。" : "接受前服务端会再次校验验收策略和候选内容";
   $("reject-task").hidden = task.status !== "awaiting_review"; $("cancel-task").hidden = !active.has(task.status); disableByPolicy($("cancel-task"), task.cancel_requested);
   $("follow-task").hidden = active.has(task.status) || !task.workspace_ready; $("download-patch").hidden = !task.diff; $("download-zip").hidden = !task.workspace_ready;
   $("resume-task").hidden = !(engineOf(task) === "forge" && task.status === "failed" && task.checkpoint_revision > 0 && task.workspace_ready);
@@ -147,7 +159,7 @@ function renderDetail() {
   // poll returns unchanged content. Events are immutable and identified by ID.
   const content = state.tab === "activity" ? state.events.map(event => event.id)
     : state.tab === "diff" ? task.diff
-    : state.tab === "tests" ? [task.test_command, task.baseline_test, task.verification]
+    : state.tab === "tests" ? [task.test_command, task.acceptance_suite_id, task.acceptance_suite_digest, task.baseline_test, task.verification]
     : state.tab === "runtime" ? [task.engine, task.checkpoint_revision, task.usage, task.timeout_seconds, state.events.map(event => event.id), state.operations, state.operationsError]
     : [task.engine, task.error, task.summary, task.session_id, task.checkpoint_revision, task.usage];
   const renderKey = JSON.stringify([task.id, state.tab, content]);
@@ -165,8 +177,14 @@ function renderDetail() {
     else { const code = node("div", "code-panel"); for (const line of task.diff.split("\n")) code.append(node("div", `diff-line ${line.startsWith("+") ? "add" : line.startsWith("-") ? "del" : line.startsWith("@@") ? "hunk" : ""}`, line)); panel.append(code); }
   } else if (state.tab === "tests") {
     panel.append(node("p", "hint", `验收命令：${task.test_command || "未配置"}。以下结果由隔离的 Docker 容器独立运行，不使用模型的口头结论。`));
-    for (const [title, result] of [["修改前 · 基线测试", task.baseline_test], ["修改后 · 独立验收", task.verification]]) {
+    panel.append(node("p", "hint", task.acceptance_suite_id ? `已固定独立验收策略：${task.acceptance_suite_id}\n策略摘要：${task.acceptance_suite_digest}` : "此任务未绑定独立验收包，属于项目命令验证。"));
+    for (const [title, result] of [["修改前 · 基线测试", task.baseline_test], [task.acceptance_suite_id ? "修改后 · 独立验收" : "修改后 · 项目命令验证", task.verification]]) {
       const card = node("div", "test-card"), heading = node("h3", "", title); heading.append(node("span", "", result ? `exit ${result.exit_code}${result.timed_out ? " · 超时" : ""}` : "尚无结果")); card.append(heading, node("pre", "", result ? `${result.stdout || ""}${result.stderr || ""}${result.truncated ? "\n[输出已截断]" : ""}` : "未运行")); panel.append(card);
+      if (result?.acceptance) {
+        const proof = result.acceptance;
+        card.append(node("p", proof.passed ? "hint" : "error-text", proof.passed ? "独立验收通过 · 受保护文件校验通过" : "独立验收拒绝此候选"));
+        card.append(node("pre", "", JSON.stringify({tests: proof.tests, violations: proof.violations, candidate_digest: proof.candidate_digest}, null, 2)));
+      }
     }
   } else {
     if (task.error) panel.append(node("p", "error-text", task.error));
@@ -194,5 +212,33 @@ $("import-form").onsubmit = async event => {
   } catch (e) { $("import-error").textContent = e.message; } finally { $("import-submit").disabled = false; }
 };
 $("sample-create").onclick = () => action($("sample-create"), async () => { const project = await post("/projects/sample"); await refresh(); selectProject(project.id); $("prompt").value = project.suggested_prompt; toast("已载入示例，点击开始执行即可修复失败测试"); });
+$("acceptance-open").onclick = () => action($("acceptance-open"), async () => {
+  if (!state.project) throw new Error("请先选择项目。");
+  const id = state.project, project = state.projects.find(p => p.id === id);
+  const policies = await api(`/projects/${id}/acceptance-suites`);
+  $("acceptance-form").dataset.projectId = id;
+  $("acceptance-current").textContent = `${project.name} · ${policies.suites.length ? `已有 ${policies.suites.length} 个策略版本` : "尚未配置独立验收"}`;
+  $("acceptance-error").textContent = ""; $("acceptance-dialog").showModal();
+});
+$("acceptance-close").onclick = () => $("acceptance-dialog").close();
+$("acceptance-form").onsubmit = async event => {
+  event.preventDefault(); $("acceptance-error").textContent = "";
+  await action($("acceptance-submit"), async () => {
+    try {
+      const selected = [...$("acceptance-files").files], files = {};
+      if (!selected.length || selected.length > 50 || selected.reduce((sum, file) => sum + file.size, 0) > 1024 * 1024) throw new Error("请选择 1–50 个 Python 测试文件，总大小不超过 1 MiB。");
+      for (const file of selected) {
+        if (!/^[A-Za-z0-9_.-]+\.py$/.test(file.name) || file.name in files) throw new Error("请使用互不重复的 Python 文件名。");
+        files[file.name] = await file.text();
+      }
+      const body = {name: $("acceptance-name").value.trim(), files, test_paths: Object.keys(files),
+        protected_paths: $("acceptance-protected").value.split(/\r?\n/).map(x => x.trim()).filter(Boolean),
+        python_paths: $("acceptance-python-paths").value.split(",").map(x => x.trim()).filter(Boolean),
+        minimum_tests: Number($("acceptance-min-tests").value), timeout_seconds: 120};
+      await post(`/projects/${$("acceptance-form").dataset.projectId}/acceptance-suites`, body);
+      $("acceptance-dialog").close(); $("acceptance-files").value = ""; await refresh(); toast("独立验收策略已发布，新任务将固定这个版本");
+    } catch (error) { $("acceptance-error").textContent = error.message; }
+  });
+};
 setInterval(async () => { if (!state.token || state.busy || document.hidden) return; state.busy = true; try { await refresh(); } catch (e) { $("engine-name").textContent = "连接中断 · 自动重试"; } finally { state.busy = false; } }, 2500);
 if (state.token) login().catch(e => { logout(); $("login-error").textContent = e.message; });

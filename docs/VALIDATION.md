@@ -89,7 +89,39 @@ cachetools 的首次补丁通过给 `_MethodDescriptor.__class__` 返回 `types.
 
 修复部署后，另外复跑真实 HTTP/PostgreSQL/Docker 的 [完整流程检查](evidence/coding-flow-after.json) 和 [AgentRuntime 丢应答恢复](evidence/forge-recovery-after.json)，全部通过；后者仍为 `[false, true, false]` 的工具结果复用、2 条持久操作、最终验收 exit 0。两项均为脚本决策、0 模型调用。两个 API 副本的已安装源码 SHA-256 均与修复后探针报告一致：`cae2f103eb28f8f47d6c1741c248fe6b0e7ac3956a4081d8fac35f4c9ba50d45`。
 
-冻结快照增加了持久卷占用，尚无完整的保留期限与垃圾回收策略；最终状态一致也不代表已运行的容器会立即终止。通用任务测试防篡改、提示注入和跨机器产物恢复等剩余边界列于 [面试讨论](INTERVIEW.md)。
+冻结快照增加了持久卷占用，尚无完整的保留期限与垃圾回收策略；最终状态一致也不代表已运行的容器会立即终止。本轮新增的独立验收与原文持久化见下一节；提示注入、恶意解释器和真实多主机恢复等剩余边界列于 [面试讨论](INTERVIEW.md)。
+
+## 对照开源后的独立验收与原文持久化
+
+本轮固定读取 SWE-bench、mini-swe-agent、OpenHands SDK 与 LangGraph 的源码，设计对应关系见 [开源对照](OPEN_SOURCE_DESIGN.md)。以下都是确定性工程检查或已有候选重新评分，**本轮没有新增模型调用**，不更新前面历史模型任务的首次成绩。
+
+| 实机检查 | 结果 | 证据范围 |
+|---|---|---|
+| [API 验收](evidence/acceptance-live.json) | **13/13** | 真实 HTTP/PostgreSQL/Docker；无 suite、命令改 true、测试包私有性、shell 改/删保护文件、pytest.ini/conftest/pytest.py/sitecustomize 干扰、假 stdout、skip、空测试、旧策略及正确接受 |
+| [固定 Docker 运行器](evidence/acceptance-sandbox.json) | **10/10** | 只读挂载、删隐藏测试、配置干扰、假 stdout、零测试、skip/xfail/xpass、超时、导入命名冲突；候选内容均未被验收污染，本次私有卷清理完成 |
+| [服务端 artifact](evidence/forge-artifacts.json) | **10/10** | 原文未落库时 checkpoint 409；保存后通过；PUT 幂等；错哈希/错元数据拒绝；跨身份隐藏；UTF-8 字节上限；旧租约拒绝；新客户端无本地文件恢复；checkpoint 保持有界 |
+| [完整任务流程](evidence/coding-flow-acceptance.json) | **10 个断言全部通过** | 已适配强制 suite：完整 diff、版本推进、过期接受/旧 source 请求拒绝、测试副作用隔离、幂等完成、SSE、非法归档 |
+| [循环丢应答恢复](evidence/forge-recovery-durable.json) | **通过** | 接入 ServerArtifacts 后仍为 `[false, true, false]` 结果复用，2 条持久工具操作，最终命令验证 exit 0；2 个脚本决策、0 模型调用 |
+
+artifact 探针换了有效租约和 HTTP 客户端，四页读取 **43,527 个 UTF-8 字节**，与原始内容 SHA-256 完全一致；没有旧目录可用。它验证的是服务器读取协议，物理主机数量为 **1**。16 MiB 总量和 256 项数量配额有功能单测，本次实机检查只验证单项字节上限，不把单测说成真实 PostgreSQL 配额竞争实验。没有杀 worker 或数据库灾备演练。
+
+### 历史真实坏补丁能否被新验收拦住
+
+[同策略三方报告](evidence/acceptance-oss-live.json) 在同一个新测试项目、相同 suite ID/digest 下检查已保存的 cachetools 源码。独立包包含冻结 oracle 的 7 项、已披露的兼容性复审 3 项，以及确认导入 `/workspace/src/cachetools` 候选的 1 项；原项目测试文件全部加入保护清单。
+
+| 已有输入 | 11 项独立测试 | 接受结果 |
+|---|---|---|
+| 冻结上游父版本 | 7 passed / 4 failed | 409 拒绝 |
+| 首次真实模型坏候选 | 8 passed / 3 failed | 409 拒绝 |
+| 已复审的最终修复 | 11 passed | 200 接受，测试项目版本推进 |
+
+这里接受的是 `isolation-test` 的新回归项目，不改变历史真实任务的状态。复审用例曾反馈给模型，候选也来自已有运行，因此这是反馈感知的回归验证，不是新盲测或新的修复成功率。
+
+### 可复现性与限制
+
+执行脚本为 `check_acceptance.py`、`check_acceptance_sandbox.py`、`check_acceptance_oss.py`、`check_forge_artifacts.py`、`check_coding_flow.py`、`check_forge_recovery.py`。队列探针串行运行；报告保留每项 task ID、测试计数、策略/候选摘要和失败原因。已有本机报告后，运行 `python scripts/export_engineering_evidence.py` 导出经过本机凭据值检查的副本及 [源码与报告哈希清单](evidence/engineering-manifest.json)。部署核对中，两 API 安装的 **34 个源码/静态资源文件**与工作区逐字节匹配，镜像 ID 见 [部署记录](evidence/deployment-hardening.json)。
+
+候选仍与 pytest 同解释器执行；这些探针不证明可抵御任意恶意 Python，也没有真实模型提示注入攻击集。无套件旧任务、策略升级和受限 Python/pytest 的具体语义见 [ACCEPTANCE.md](ACCEPTANCE.md)；原文事务顺序、旧文件迁移失败与存储保留限制见 [ARTIFACTS.md](ARTIFACTS.md)。
 
 ## 100 任务队列实测
 
@@ -116,9 +148,9 @@ cachetools 的首次补丁通过给 `_MethodDescriptor.__class__` 返回 `types.
 
 ## 自动化与界面
 
-- 最终 Python 自动化：**256 passed、2 skipped、9 subtests passed**；本轮增加 11 项生命周期回归。跳过项为真实 provider 的 opt-in 调用、Windows 符号链接权限；实际模型任务和 Linux 沙箱另有独立证据。
+- 最终 Windows Python 自动化：**371 passed、2 skipped、9 subtests passed**；相较上一版新增 115 项验收、沙箱和 artifact 回归。跳过项为真实 provider 的 opt-in 调用、Windows 符号链接权限；实际模型任务和 Linux 沙箱另有独立证据。
 - Ruff `check .` 通过；冻结的上游参考源文件保留原字节，不参与本项目格式检查。
-- Studio 已部署资源 + 真实只读 API 最终验收 **24/24**，JS/console 错误 0，报告 `results/studio-deployed-final/studio-check.json`。覆盖桌面、390px 手机、真实 Forge diff/测试/检查点/工具记录；隔离 mock 另测创建 engine、resume、不确定操作禁用和请求竞态，不冒充真实服务写入测试。
+- Studio 已部署资源 + 真实只读 API 最终验收 **29/29**，JS/console 错误 0，报告 [studio-acceptance.json](evidence/studio-acceptance.json)。覆盖桌面、390px 手机、真实 Forge diff/测试/检查点/工具记录、策略元数据对话框和旧任务文案；隔离 mock 另测策略上传、proof 展示、无策略/旧策略接受禁用，以及既有创建/resume/竞态，不冒充真实服务写入测试。
 - 沙箱原实机检查 14/14 通过，详见 [底层沙箱与旧 CLI 记录](CODEX_BASELINE_VALIDATION.md)。
 
 最新双 API、数据库、网关和 broker 部署健康，Forge worker 配置 2 槽位。原始模型事件、ZIP、patch、故障注入和 UI 截图保留在本机 `results/`；首次模型结果与中断快照单独保留。

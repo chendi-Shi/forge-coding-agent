@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+from acceptance_runner import run_acceptance
 from helper import SandboxError, dispatch
 from runner import run_command
 
@@ -16,7 +17,12 @@ def main():
         request_file.unlink()
         if not isinstance(payload, dict) or not isinstance(payload.get("arguments", {}), dict):
             raise ValueError("Invalid tool request")
-        result = run_command(payload["arguments"]) if payload.get("name") == "run_command" else dispatch(payload)
+        if payload.get("name") == "verify":
+            result = run_acceptance(payload["arguments"])
+        elif payload.get("name") == "run_command":
+            result = run_command(payload["arguments"])
+        else:
+            result = dispatch(payload)
         print(json.dumps(result, ensure_ascii=True))
     except SandboxError as exc:
         print(json.dumps({"error": {"code": exc.code, "message": str(exc)[:500]}}))

@@ -5,10 +5,11 @@
 ```mermaid
 flowchart LR
   UI[Studio / REST / SSE] --> API[FastAPI 双副本]
-  API --> DB[(PostgreSQL 任务 / 租约 / 检查点 / 工具日志)]
+  API --> DB[(PostgreSQL 任务 / 租约 / 检查点 / 工具日志 / 观察原文 / 验收策略)]
   Worker[Forge worker] -->|领取与续租| API
   Worker --> Loop[有界 Agent 循环]
   Loop --> Context[上下文窗口 / 原始观察产物]
+  Context -->|先存原文，再发布引用| API
   Context --> Model[单步决策适配器]
   Model --> Schema[JSON Schema 校验]
   Schema -->|保存 pending call| DB
@@ -16,9 +17,10 @@ flowchart LR
   Schema -->|经 API 持久化意图| Broker[内部 Sandbox Broker]
   Broker --> Docker[独立 Docker 工作区]
   Docker -->|观察 / diff / 测试反馈| Loop
-  Loop -->|finish| Verify[独立副本测试]
+  Loop -->|finish| Verify[独立副本 / 只读验收包 / 严格测试计数]
+  DB -->|任务固定 suite 版本| Verify
   Verify -->|失败且预算允许| Loop
-  Verify -->|通过| Review[人工审核 / 版本推进]
+  Verify -->|通过| Review[人工审核 / 校验策略与候选哈希 / 版本推进]
 ```
 
 图中的数据库箭头表示逻辑持久化，worker 实际通过 API 访问，不能直连数据库。旧 LangGraph 示例使用 Redis；Forge 队列本身由 PostgreSQL 管理，不依赖 Redis 投递。
@@ -29,9 +31,9 @@ flowchart LR
 
 默认预算为 30 次决策、每次 12,000 个上下文估算 token、累计 350,000 个已报告 input/output token、最多 2 次 finish 验收失败后的修复机会，以及任务的墙钟超时。累计 token 是调用后检查，费用可能被最后一次调用超出，但超限决策不会再派发工具。CLI 的隐藏系统提示不计入本地上下文估算。恢复沿用已持久化步数、token 预算与绝对截止时间；截止时间包含中断期间的等待，不因 resume 重置。网络中断导致供应商未返回 usage 时无法精确计算已消耗额度。模型没有返回合法结构化动作或调用内置工具时，任务明确失败。
 
-`finish` 不能直接声明成功。循环固定调用 `run_tests`，将失败观察重新送回模型；最终 complete 接口再次在新 Docker 副本执行固定验收命令。通过后进入 awaiting_review，人类接受才推进项目版本。测试命令为空不会被 Forge 当成完成。隐藏 oracle 仅存在于离线评测器，避免模型改测试得到假阳性。
+`finish` 不能直接声明成功。循环固定调用 `run_tests`，将失败观察重新送回模型；最终 complete 接口再次在新 Docker 副本执行任务固定的独立验收策略。通过后进入 awaiting_review，人类接受才推进项目版本。没有测试命令且没有独立 suite 时，Forge 不会把空验证当成完成。
 
-固定验收命令与独立执行副本不等于不可篡改测试。通用 Forge 工作区允许工具修改测试文件，当前没有强制的受保护测试清单；不改测试的提示也不是访问控制。只有冻结 issue 评测器核对原测试字节并注入独立 oracle。生产通用任务仍需要审核测试 diff，不能把 exit 0 当成防作弊证明。
+项目的 acceptance suite 作为不可变版本保存在 PostgreSQL，任务创建时固定 ID/digest。保护清单在策略发布时按当前项目文件生成，验证前比较候选文件哈希；私有测试只读挂载，固定 pytest 运行器忽略仓库配置、conftest 和 stdout 的成功声明。接受时重新计算候选内容摘要，并检查任务策略仍是项目当前策略；无 suite 的历史候选不能新接受。候选 Python 与 pytest 仍共享解释器，不提供恶意代码对评分进程篡改的完整防护。接口、版本升级和支持范围见 [独立验收设计](ACCEPTANCE.md)。
 
 ## 工具调用的故障语义
 
@@ -49,7 +51,11 @@ flowchart LR
 
 首次工作区准备另有事务级 advisory lock，外部初始化和基线测试期间不持 Task 行锁，以免长测试阻塞心跳。任务使用固定标识的初始快照保留修改前内容，基线结果与 `workspace_ready` 在重新加行锁、检查当前租约和取消状态后一起提交。旧任务若已 ready 但没有基线，不从当前可变文件伪造补录。完成流程把外部结果暂存局部变量，最后禁止自动 flush 并重新加行锁刷新控制字段，防止取消竞态或旧完成请求覆盖新租约。额外初始快照增加持久卷占用，完整生命周期清理仍待实现。
 
-上下文观察以内容摘要存入 worker 的本地产物目录，消息只保留受限预览与引用。工具原始结果同时保存在 PostgreSQL ToolOperation；模型决策、context 预算和 repair 事件可从 SSE 重放。跨 worker 恢复时原 worker 的本地 artifact 可能不可用，模型仍可重新进行只读源码检查；当前不把本地产物伪装成分布式对象存储。
+上下文观察原文存入服务端 PostgreSQL `forge_artifacts`，消息只保留受限预览和内容哈希引用。[worker](../scripts/forge_worker.py#L53) 先等待原文上传成功，再发布 observation 事件和保存 checkpoint；[checkpoint API](../src/agent_backend/forge/api.py#L61) 在行锁与 CAS 检查后验证引用确已属于该任务且元数据一致，避免发布悬空引用。新 worker 取得有效租约后只需通过 API 分页读取，不依赖旧 worker 的目录。
+
+[artifact API](../src/agent_backend/forge/artifacts.py#L49) 同时校验 Task owner 和租约，按任务隔离内容哈希。原文不可覆盖，相同内容上传幂等；单项限制 1 MiB，每任务 16 MiB / 256 项，配额与写入在同一 Task 行锁内检查。旧版本的本地原文只有仍存在并通过哈希核对时才能迁移；原文已丢失就明确失败，不能靠摘要恢复或重新执行命令冒充原始观察。
+
+工具原始结果仍可能同时保存在 `ToolOperation.result` 和事件 payload，事件可从 SSE 重放；当前没有消除这些副本，也没有 artifact retention / GC。实现提供跨 worker 的服务端读取协议，尚无真实多物理主机或数据库灾备证据。接口、事务顺序、测试入口与限制见 [ARTIFACTS.md](ARTIFACTS.md)。
 
 ## 代码检索与上下文
 

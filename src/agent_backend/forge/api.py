@@ -12,9 +12,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agent_backend.coding.api import ACTIVE, identity, leased, owned, public, record, verify_workspace
+from agent_backend.coding.api import ACTIVE, identity, leased, owned, public, record, verify_task_workspace
 from agent_backend.coding.broker import broker, tool
 from agent_backend.coding.models import Event, Project, Task, ToolOperation, now
+from agent_backend.forge.artifacts import validate_checkpoint_artifacts
 from agent_backend.forge.protocol import digest, validate_tool
 
 router = APIRouter(prefix="/api/coding/tasks", tags=["Forge runtime"])
@@ -57,6 +58,7 @@ async def save_checkpoint(task_id: UUID, body: Checkpoint, owner=Depends(identit
         raise HTTPException(413, "Checkpoint exceeds 1 MB; compact observations first")
     if task.checkpoint_revision != body.expected_revision:
         raise HTTPException(409, "Checkpoint revision changed")
+    await validate_checkpoint_artifacts(session, task, body.state)
     task.runtime_state, task.checkpoint_revision = body.state, task.checkpoint_revision + 1
     await session.commit()
     return {"revision": task.checkpoint_revision}
@@ -102,7 +104,7 @@ async def execute_tool(task_id: UUID, body: ToolRequest, owner=Depends(identity)
     except (ValueError, ValidationError):
         raise HTTPException(422, "Tool arguments do not match their schema") from None
     if body.name in {"repository_search", "read_artifact"}:
-        raise HTTPException(422, "This read-only tool runs against worker-local artifacts")
+        raise HTTPException(422, "This read-only tool uses worker-dispatched retrieval or the artifact API")
     task = await owned(session, Task, task_id, owner, lock=True)
     running(task, body.lease_token)
     fingerprint = digest({"name": body.name, "arguments": body.arguments})
@@ -122,10 +124,10 @@ async def execute_tool(task_id: UUID, body: ToolRequest, owner=Depends(identity)
     await session.commit()  # Commit intent before external effects; never guess on crash.
     try:
         if body.name == "run_tests":
-            if not task.test_command:
+            if not task.test_command and not task.acceptance_suite_id:
                 result = {"error": "No verification command configured", "exit_code": None}
             else:
-                result = await verify_workspace(task.id, task.test_command)
+                result = await verify_task_workspace(session, task, task.id)
         elif body.name == "get_diff":
             result = await broker("GET", f"/workspaces/{task.id}/diff")
         elif body.name == "read_file":

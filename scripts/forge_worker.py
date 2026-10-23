@@ -4,7 +4,6 @@
 import asyncio
 import hashlib
 import os
-import re
 import signal
 import sys
 import time
@@ -18,32 +17,11 @@ from dotenv import dotenv_values
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
+from agent_backend.forge.artifact_client import ArtifactPersistenceError, ServerArtifacts  # noqa: E402
 from agent_backend.forge.protocol import MUTATING_TOOLS, digest  # noqa: E402
 from agent_backend.forge.providers import CodexDecisionProvider, OpenAICompatibleProvider, ProviderError  # noqa: E402
 from agent_backend.forge.retrieval import CodeIndex  # noqa: E402
 from agent_backend.forge.runtime import AgentRuntime, RuntimeFailure  # noqa: E402
-
-
-class FileArtifacts:
-    def __init__(self, directory):
-        self.directory = directory
-        directory.mkdir(parents=True, exist_ok=True)
-
-    def put(self, text, kind):
-        key = hashlib.sha256((kind + "\0" + text).encode()).hexdigest()
-        path = self.directory / f"{key}.txt"
-        if not path.exists():
-            path.write_text(text, encoding="utf-8")
-        return "artifact://" + key
-
-    def read(self, uri, offset=0):
-        if not re.fullmatch(r"artifact://[a-f0-9]{64}", uri):
-            return {"error": "Invalid artifact URI"}
-        path = self.directory / (uri.removeprefix("artifact://") + ".txt")
-        if not path.exists():
-            return {"error": "Artifact is on the original worker; use read_file or rerun a read-only inspection"}
-        value = path.read_text(encoding="utf-8")
-        return {"uri": uri, "offset": offset, "content": value[offset:offset + 8000], "next_offset": offset + 8000 if len(value) > offset + 8000 else None}
 
 
 class ForgeJob(CodingJob):
@@ -56,7 +34,7 @@ class ForgeJob(CodingJob):
     async def run(self):
         self.directory = self.directory.parent / self.task_id
         self.directory.mkdir(parents=True, exist_ok=True)
-        artifacts = FileArtifacts(self.directory / "artifacts")
+        artifacts = ServerArtifacts(self.backend.client, self.task_id, self.lease, legacy_directory=self.directory / "artifacts")
         heartbeat = asyncio.create_task(self.heartbeat())
         streaming = None
         state = None
@@ -73,11 +51,16 @@ class ForgeJob(CodingJob):
                 dirty = False
 
                 async def emit(event):
+                    if event.get("artifact"):
+                        await artifacts.flush()
                     self.journal.append(event)
 
                 async def checkpoint(value):
                     nonlocal state
                     state = value
+                    # Publish only references whose complete bytes are durable.
+                    # This also imports available pre-migration local artifacts.
+                    await artifacts.prepare_checkpoint(value)
                     body = {"lease_token": self.lease, "expected_revision": self.revision, "state": value}
                     try:
                         result = await self.request("PUT", "/checkpoint", json=body)
@@ -99,7 +82,7 @@ class ForgeJob(CodingJob):
                             dirty = False
                         return asdict(index.search(arguments["query"], limit=arguments.get("limit", 5), max_tokens=2600))
                     if name == "read_artifact":
-                        return artifacts.read(**arguments)
+                        return await artifacts.read(**arguments)
                     result = await self.request("POST", "/tools", json={"lease_token": self.lease, "call_id": call_id, "name": name, "arguments": arguments}, timeout=300)
                     dirty |= name in MUTATING_TOOLS
                     return result["result"]
@@ -113,7 +96,7 @@ class ForgeJob(CodingJob):
                 remaining = (state or {}).get("deadline", time.time() + self.task["timeout_seconds"]) - time.time()
                 async with asyncio.timeout(max(0.001, remaining)):
                     state = await self.cancellable(runtime.run(self.task, state))
-        except (ProviderError, RuntimeFailure, WorkerError) as exc:
+        except (ProviderError, RuntimeFailure, WorkerError, ArtifactPersistenceError) as exc:
             error = str(exc)
         except TimeoutError:
             error = "TASK_TIME_BUDGET_EXHAUSTED"

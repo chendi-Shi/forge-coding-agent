@@ -1,0 +1,135 @@
+{
+  "started_at": "2026-10-23T10:15:46.952552+00:00",
+  "real_model_calls": 0,
+  "scope": "Real deployed API/PostgreSQL/Docker acceptance of three existing cachetools issue443 candidates; no model calls.",
+  "limitations": [
+    "Not a proof against arbitrary malicious Python in the pytest process.",
+    "No direct PostgreSQL fault injection and no service/worker termination.",
+    "Only newly created isolation-test projects are mutated."
+  ],
+  "cases": [
+    {
+      "name": "upstream_parent",
+      "passed": true,
+      "input_archive_sha256": "2c64180ee9e78de1829c2faad9aae76e5d56c60524f60b4be45a857fc765123d",
+      "project_id": "4b9f61cb-94f7-4314-885f-66450360ee1d",
+      "task_id": "49a997ce-307e-4ff0-8006-b19544d38ee5",
+      "suite_id": "4f0ff23a-54b4-4e2d-ae71-4e9be5a0383c",
+      "changed_paths": [],
+      "status": "awaiting_review",
+      "verification": {
+        "exit_code": 1,
+        "stdout": "Trusted acceptance: collected=11, passed=7, failed=4, errors=0, skipped=0, xfailed=0, xpassed=0",
+        "stderr": "Trusted acceptance did not satisfy the fixed policy",
+        "acceptance": {
+          "suite_id": "4f0ff23a-54b4-4e2d-ae71-4e9be5a0383c",
+          "policy_digest": "7e6068b21129f0ddd5d1c2d70d630a2f17cce9fdf2fda2ebb1875959c90e6637",
+          "candidate_digest": "0fb04f8cbba493e5bd06a5c2b092de70a34ba2dee9f81deb6f26bfaa0af1eb9e",
+          "passed": false,
+          "violations": [],
+          "tests": {
+            "collected": 11,
+            "passed": 7,
+            "failed": 4,
+            "errors": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0
+          }
+        }
+      },
+      "accept_status": 409,
+      "seconds": 21.274
+    },
+    {
+      "name": "first_model_candidate_review_failure",
+      "passed": true,
+      "input_archive_sha256": "1add1c30b2df863e627768a280a0f3575f38aeadc3151d5e232a0c071f6cb933",
+      "project_id": "4b9f61cb-94f7-4314-885f-66450360ee1d",
+      "task_id": "dbb26891-73d0-4219-88b5-d3eb07592902",
+      "suite_id": "4f0ff23a-54b4-4e2d-ae71-4e9be5a0383c",
+      "changed_paths": [
+        "src/cachetools/_descriptor.py",
+        "tests/test_cachedmethod_autospec.py"
+      ],
+      "status": "awaiting_review",
+      "verification": {
+        "exit_code": 1,
+        "stdout": "Trusted acceptance: collected=11, passed=8, failed=3, errors=0, skipped=0, xfailed=0, xpassed=0",
+        "stderr": "Trusted acceptance did not satisfy the fixed policy",
+        "acceptance": {
+          "suite_id": "4f0ff23a-54b4-4e2d-ae71-4e9be5a0383c",
+          "policy_digest": "7e6068b21129f0ddd5d1c2d70d630a2f17cce9fdf2fda2ebb1875959c90e6637",
+          "candidate_digest": "c94275dd1e8dc8f20c165d96f958f2652d5e4d86e7aafc1362c7187c6a3d2690",
+          "passed": false,
+          "violations": [],
+          "tests": {
+            "collected": 11,
+            "passed": 8,
+            "failed": 3,
+            "errors": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0
+          }
+        }
+      },
+      "accept_status": 409,
+      "seconds": 23.016
+    },
+    {
+      "name": "reviewed_final_repair_candidate",
+      "passed": true,
+      "input_archive_sha256": "0f499d927134be5d30a6dd3294396cb79816761be8906af4948ee0ac79a9b810",
+      "project_id": "4b9f61cb-94f7-4314-885f-66450360ee1d",
+      "task_id": "0a4524bc-4dae-4a8d-911f-94d3be7e7226",
+      "suite_id": "4f0ff23a-54b4-4e2d-ae71-4e9be5a0383c",
+      "changed_paths": [
+        "src/cachetools/_descriptor.py",
+        "tests/test_cachedmethod_autospec.py",
+        "tests/test_cachedmethod_descriptor_inspection.py"
+      ],
+      "status": "awaiting_review",
+      "verification": {
+        "exit_code": 0,
+        "stdout": "Trusted acceptance: collected=11, passed=11, failed=0, errors=0, skipped=0, xfailed=0, xpassed=0\nProject tests:\n",
+        "stderr": "\n",
+        "acceptance": {
+          "suite_id": "4f0ff23a-54b4-4e2d-ae71-4e9be5a0383c",
+          "policy_digest": "7e6068b21129f0ddd5d1c2d70d630a2f17cce9fdf2fda2ebb1875959c90e6637",
+          "candidate_digest": "b63244bfc10464f059a18d7fd17b59057cde4158f41abe46028182463f5e847d",
+          "passed": true,
+          "violations": [],
+          "tests": {
+            "collected": 11,
+            "passed": 11,
+            "failed": 0,
+            "errors": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0
+          }
+        },
+        "development_tests": {
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": "",
+          "truncated": false,
+          "duration": 0.003707,
+          "timed_out": false
+        }
+      },
+      "accept_status": 200,
+      "seconds": 31.957
+    }
+  ],
+  "all_passed": true,
+  "blind_evaluation": false,
+  "parent_commit": "eba200635273fe45b67e669b84cb45f995b27c24",
+  "issue_url": "https://github.com/tkem/cachetools/issues/443",
+  "evaluation_note": "Frozen issue oracle plus previously disclosed post-hoc compatibility tests and candidate-origin assertion. Does not revise earlier scores or count as fresh model success.",
+  "project_id": "4b9f61cb-94f7-4314-885f-66450360ee1d",
+  "suite_id": "4f0ff23a-54b4-4e2d-ae71-4e9be5a0383c",
+  "policy_digest": "7e6068b21129f0ddd5d1c2d70d630a2f17cce9fdf2fda2ebb1875959c90e6637",
+  "finished_at": "2026-10-23T10:17:04.891210+00:00"
+}

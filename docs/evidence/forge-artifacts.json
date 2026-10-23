@@ -1,0 +1,53 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "name": "checkpoint_rejects_unpersisted_reference",
+      "passed": true
+    },
+    {
+      "name": "checkpoint_publishes_after_bytes",
+      "passed": true
+    },
+    {
+      "name": "identical_put_is_idempotent",
+      "passed": true
+    },
+    {
+      "name": "hash_mismatch_rejected",
+      "passed": true
+    },
+    {
+      "name": "checkpoint_metadata_mismatch_rejected",
+      "passed": true
+    },
+    {
+      "name": "cross_owner_hidden",
+      "passed": true
+    },
+    {
+      "name": "utf8_byte_limit_rejected",
+      "passed": true
+    },
+    {
+      "name": "old_lease_cannot_read",
+      "passed": true
+    },
+    {
+      "name": "fresh_worker_reads_original_without_local_files",
+      "passed": true,
+      "pages": 4,
+      "utf8_bytes": 43527,
+      "sha256": "aed8d5ead37af8c57d62f4ccb531912ec8b3891871d9386c514d2df722a3d3cf"
+    },
+    {
+      "name": "checkpoint_stays_bounded",
+      "passed": true
+    }
+  ],
+  "real_model_calls": 0,
+  "evidence_type": "real_http_postgresql_fresh_clients_and_lease_replacement",
+  "physical_hosts": 1,
+  "legacy_local_files_used": false,
+  "task_id": "2fd7a7b7-577e-44dd-963f-3d0abe40cff2"
+}

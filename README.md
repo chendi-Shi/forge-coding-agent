@@ -1,6 +1,6 @@
 # Forge · 可恢复的 Coding Agent 后端
 
-面向校招／初级 Agent 应用开发的工程项目：自己实现结构化决策循环、版本化代码检索、上下文预算、持久化工具调用与检查点恢复，并用真实开源历史 bug 和隐藏测试评估修复。
+面向校招／初级 Agent 应用开发的工程项目：自己实现结构化决策循环、版本化代码检索、上下文预算、持久化工具调用与检查点恢复，以独立版本化测试验收候选，并用真实开源历史 bug 评估修复。
 
 现有 Codex 登录可以直接运行；模型 API key 不是本机演示的前提。工作台：[http://127.0.0.1:2026/studio](http://127.0.0.1:2026/studio)。
 
@@ -16,9 +16,10 @@
 |---|---|
 | 自主执行循环 | `forge/runtime.py`：模型每步返回一个 schema 校验动作；工具执行、状态、停止条件由项目控制 |
 | 代码检索 | `forge/retrieval.py`：BM25、路径/符号加权，Python AST，版本/文件摘要/行号引用；编辑后刷新索引 |
-| 上下文管理 | `forge/context.py`：有界窗口、完整工具交换、观察外置、确定性摘要、重复调用检测 |
+| 上下文管理 | `forge/context.py`：有界窗口、完整工具交换、确定性摘要；长观察按内容哈希存到服务端 PostgreSQL |
 | 可恢复执行 | CAS 检查点、持久化 pending call、已完成结果去重、旧租约隔离、不确定副作用拒绝重放 |
-| 修复闭环 | finish 强制固定测试，失败反馈修复；服务端再次独立验收，人工审核后推进项目版本 |
+| 独立验收 | 任务固定 suite 版本、只读测试包、受保护文件哈希、真实计数；接受时复核策略与候选内容摘要 |
+| 跨 worker 原文读取 | 原文先保存、checkpoint 后引用；租约/身份隔离、幂等上传、大小配额、Unicode 分页 |
 | 工程后端 | 双 API、副本间原子队列准入、SSE 回放、项目与身份隔离、Git diff、ZIP、接受/拒绝/follow-up |
 | 沙箱 | Forge 所有代码读写、命令和测试通过内部 broker 在 Docker 中执行 |
 | 评测 | 冻结上游父提交、独立隐藏 oracle、参考修复校准、保护原测试、保存所有实际模型事件 |
@@ -36,11 +37,13 @@
 
 两个候选都保留原测试，新增回归测试；隐藏测试与参考修复没有提供给 Agent。**这是两题历史 bug pilot，存在训练数据污染可能，不能当作 SWE-bench 或普遍成功率。** cachetools 首次候选被审查发现 introspection 回归，已拒绝。后续两次尝试预算耗尽；第四次任务在明确反馈和一次部署中断恢复后完成，最终 **87 passed + 36 subtests，兼容性复审 3 passed**。全部失败与消耗保留，不能把这条修复链写成首次自动成功。
 
-本项目自动化 **256 passed、2 skipped**；已部署 Studio **24/24**，JS/console 错误 0。可审阅 [实测摘要与报告哈希](benchmarks/forge-run-summary.json)、[最终 cachetools 补丁](benchmarks/example-patches/cachetools-reviewed.patch) 和 [boltons 补丁](benchmarks/example-patches/boltons-first.patch)。
+本项目 Python 自动化 **371 passed、2 skipped、9 subtests passed**。可审阅 [实测摘要与报告哈希](benchmarks/forge-run-summary.json)、[最终 cachetools 补丁](benchmarks/example-patches/cachetools-reviewed.patch) 和 [boltons 补丁](benchmarks/example-patches/boltons-first.patch)。最新 API、Docker、恢复与界面检查见 [验证记录](docs/VALIDATION.md)。
 
 控制层实测：101 个同时提交、100 个入队、1 个 429、100 个唯一租约；真实故障注入验证丢失响应后复用已完成修改，未重复执行副作用。上述控制检查使用脚本，不消耗模型调用。检索消融在固定小型合成集上，hybrid 与纯 lexical 同分，不能声称 hybrid 优于 BM25。详见 [验证记录](docs/VALIDATION.md) 与 [评测来源](benchmarks/BENCHMARKS.md)。
 
-[10 个 bad case 与面试追问](docs/INTERVIEW.md) 记录现象、根因、修复、验证及未解决边界。最新生命周期修复在同一真实 PostgreSQL 探针下由 **0/5 变为 5/5**，覆盖基线中断、心跳阻塞与完成/取消竞态；broker 使用可控替身，证据范围见 [前后对照](docs/VALIDATION.md#本轮生命周期缺陷与修复前后对照)。
+[12 个 bad case 与面试追问](docs/INTERVIEW.md) 记录现象、根因、修复、验证及未解决边界。生命周期修复在同一真实 PostgreSQL 探针下由 **0/5 变为 5/5**，覆盖基线中断、心跳阻塞与完成/取消竞态；broker 使用可控替身，证据范围见 [前后对照](docs/VALIDATION.md#本轮生命周期缺陷与修复前后对照)。
+
+本轮读取 SWE-bench、mini-swe-agent、OpenHands SDK 和 LangGraph 的固定 GitHub 提交，把独立评分与原文持久化原则落实到现有后端；源码链接、采用的设计和未照搬的保证见 [开源对照](docs/OPEN_SOURCE_DESIGN.md)。
 
 ## 启动与配置
 
@@ -68,7 +71,9 @@ FORGE_TOKEN_PARAMETER=max_completion_tokens
 
 ## 如何演示
 
-打开工作台，选择 `OSS · cachetools-autospec` 或 `OSS · boltons-pearson`，查看真实任务的运行与工具记录、diff、固定测试和模型总结。导入新项目后选择 Forge，填写需求和测试命令即可运行。失败且仍有预算、无不确定工具状态的任务可从检查点恢复；其他情况可以新建 follow-up。
+打开工作台，选择 `OSS · cachetools-autospec` 或 `OSS · boltons-pearson`，查看真实任务的运行与工具记录、diff、测试和模型总结。导入新项目后先通过“验收策略”上传独立测试、配置保护文件，再创建 Forge 任务。样例项目自带验收策略。失败且仍有预算、无不确定工具状态的任务可从检查点恢复；其他情况可以新建 follow-up。
+
+历史任务不会被伪造补入新策略：无 suite 的候选仍可查看、下载，但不能新接受。策略发布仅影响新任务，变更后旧候选需要新建 follow-up。详见 [验收配置与版本语义](docs/ACCEPTANCE.md)。
 
 详细设计和取舍见 [架构说明](docs/ARCHITECTURE.md)；如何讲清项目及可据实写入简历的内容见 [演示与面试讨论](docs/INTERVIEW.md)。项目是工程作品，不代表任何公司的录用标准。
 
@@ -83,6 +88,10 @@ FORGE_TOKEN_PARAMETER=max_completion_tokens
 ```powershell
 .venv\Scripts\python.exe -m pytest -q
 .venv\Scripts\ruff.exe check .
+.venv\Scripts\python.exe scripts/check_acceptance.py
+.venv\Scripts\python.exe scripts/check_acceptance_sandbox.py
+.venv\Scripts\python.exe scripts/check_acceptance_oss.py
+.venv\Scripts\python.exe scripts/check_forge_artifacts.py
 .venv\Scripts\python.exe scripts/check_forge_control.py
 .venv\Scripts\python.exe scripts/check_forge_recovery.py
 .venv\Scripts\python.exe scripts/check_coding_flow.py
@@ -98,14 +107,14 @@ FORGE_TOKEN_PARAMETER=max_completion_tokens
 python scripts/prepare_issue_benchmarks.py evaluate --case cachetools-autospec --candidate results/forge-cachetools-autospec.zip --report results/forge-cachetools-autospec-oracle.json
 ```
 
-控制层脚本使用 `.env` 中的 `isolation-test` 身份。原始本地报告和模型事件位于 `results/`；完整说明在 `docs/VALIDATION.md`，固定考题定义与结构化摘要在 `benchmarks/`。本机已有所有报告时，可运行 `python scripts/export_forge_evidence.py` 重新导出不含认证配置的实测摘要。
+控制层脚本使用 `.env` 中的 `isolation-test` 身份；队列探针应串行运行，不要让其它 worker 消费该身份。验收探针要求此前执行器心跳过期（约 40 秒）。OSS 产物回归需要先准备冻结题目与本机保存的候选 ZIP，不会偷偷调用模型补齐。原始本地报告和模型事件位于 `results/`；完整说明在 `docs/VALIDATION.md`，固定考题定义与结构化摘要在 `benchmarks/`。本机已有历史报告时，可运行 `python scripts/export_forge_evidence.py` 重新导出原有模型实测摘要。
 
 ## API 与边界
 
-接口文档：[http://127.0.0.1:2026/docs](http://127.0.0.1:2026/docs)。Coding API 要求 bearer token，按身份隔离。新增 Forge 接口为 `tasks/{id}/tools`、`/tool-operations`、`/checkpoint` 和 `/resume`；完整任务流程仍支持 import → queue → run → verify → review。
+接口文档：[http://127.0.0.1:2026/docs](http://127.0.0.1:2026/docs)。Coding API 要求 bearer token，按身份隔离。Forge 接口包括 `tasks/{id}/tools`、`/tool-operations`、`/checkpoint`、`/resume`、`/artifacts/{digest}` 和 `projects/{id}/acceptance-suites`；完整任务流程为 import → configure acceptance → queue → run → verify → review。
 
 Docker 默认非 root、无网络、只读根目录、1 CPU / 1 GiB / 128 PID，验收使用临时复制卷。依赖需预装进沙箱镜像；源码限制为压缩 16 MiB、展开 20 MiB、2000 文件、单文件 2 MiB。非法路径/敏感路径会被拒绝，不能承诺任意仓库可直接导入。
 
-取消属于协作式取消：阻止后续动作，已提交到 broker 的命令仍可能运行至自身超时。持久卷没有磁盘硬配额，也未实现恶意多租户强隔离。原始观察的部分 artifact 存在 worker 本地，跨机器恢复可能需要重新读取源码。全部限制和故障窗口见架构说明。
+取消属于协作式取消：阻止后续动作，已提交到 broker 的命令仍可能运行至自身超时。持久卷没有磁盘硬配额，也未实现恶意多租户强隔离。独立验收目前支持受限 Python/pytest，候选和 pytest 共用解释器；只读测试不等于防恶意 Python 证明。新观察存入服务端，旧本地原文已丢失则无法凭摘要恢复；尚无真实多物理主机恢复或数据 GC 验证。全部限制和故障窗口见架构说明。
 
 旧版全自动 CLI 的结果保留于 [旧 Coding 验证](docs/CODEX_BASELINE_VALIDATION.md)，旧 LangGraph 模拟压测保留于 [历史验证](docs/LEGACY_VALIDATION.md)，不混入当前真实 Forge 结果。

@@ -8,9 +8,10 @@ COPY --from=node_runtime /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
     && useradd --uid 10001 --create-home sandbox \
-    && mkdir -p /workspace /input /opt/sandbox \
+    && mkdir -p /workspace /input /acceptance /opt/sandbox \
     && chown 10001:10001 /workspace /input
-COPY src/agent_backend/sandbox/helper.py src/agent_backend/sandbox/runner.py src/agent_backend/sandbox/entrypoint.py /opt/sandbox/
+COPY src/agent_backend/sandbox/helper.py src/agent_backend/sandbox/runner.py src/agent_backend/sandbox/entrypoint.py src/agent_backend/sandbox/acceptance_runner.py /opt/sandbox/
+RUN printf '[pytest]\naddopts =\n' > /opt/sandbox/acceptance.ini
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 LANG=C.UTF-8
 USER 10001:10001
 WORKDIR /workspace

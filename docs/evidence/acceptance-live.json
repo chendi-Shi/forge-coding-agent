@@ -1,0 +1,408 @@
+{
+  "started_at": "2026-10-23T10:09:23.450925+00:00",
+  "real_model_calls": 0,
+  "scope": "Deployed HTTP APIs backed by PostgreSQL and real Docker verification; scripted Forge tools, no model.",
+  "limitations": [
+    "Not a proof against arbitrary malicious Python in the pytest process.",
+    "No direct PostgreSQL fault injection and no service/worker termination.",
+    "Only newly created isolation-test projects are mutated."
+  ],
+  "cases": [
+    {
+      "name": "no_suite_accept_refused",
+      "passed": true,
+      "project_id": "dfebf957-cf62-4f37-86ea-a54ee441b744",
+      "task_id": "f481dc54-3a22-4d7c-a623-163ad6139957",
+      "suite_id": null,
+      "accept_status": 409,
+      "seconds": 13.366
+    },
+    {
+      "name": "private_suite_and_command_override",
+      "passed": true,
+      "project_id": "4a81cf84-c359-4ef9-a99f-aa9bb9d48c15",
+      "task_id": "7ea037e6-7013-4654-a09e-1853514130b7",
+      "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+      "status": "awaiting_review",
+      "verification": {
+        "exit_code": 1,
+        "stdout": "Trusted acceptance: collected=1, passed=0, failed=1, errors=0, skipped=0, xfailed=0, xpassed=0",
+        "stderr": "Trusted acceptance did not satisfy the fixed policy",
+        "acceptance": {
+          "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+          "policy_digest": "83b9a78a51130932b1ea3aadd757ed49270272bcc3eb2e8eb33f744be1ac9d18",
+          "candidate_digest": "14912255ec9eee69a9208483d0b36d16fe9297fac11090b3501f082e4e4e7746",
+          "passed": false,
+          "violations": [],
+          "tests": {
+            "collected": 1,
+            "passed": 0,
+            "failed": 1,
+            "errors": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0
+          }
+        }
+      },
+      "accept_status": 409,
+      "private_source_and_metadata": "absent",
+      "development_command_override": "true did not bypass private tests",
+      "seconds": 29.207
+    },
+    {
+      "name": "protected_test_modified_by_shell",
+      "passed": true,
+      "project_id": "4a81cf84-c359-4ef9-a99f-aa9bb9d48c15",
+      "task_id": "f5e422a8-8663-44a3-b948-8dd5b175a616",
+      "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+      "status": "awaiting_review",
+      "verification": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": "Protected project files changed",
+        "acceptance": {
+          "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+          "policy_digest": "83b9a78a51130932b1ea3aadd757ed49270272bcc3eb2e8eb33f744be1ac9d18",
+          "candidate_digest": "ed33d2907d9515ced9cdf1470dc4c4206c7001805c372d995f72d1b71f501e34",
+          "passed": false,
+          "violations": [
+            {
+              "path": "tests/test_public.py",
+              "reason": "modified"
+            }
+          ],
+          "tests": {}
+        }
+      },
+      "accept_status": 409,
+      "seconds": 20.758
+    },
+    {
+      "name": "protected_test_deleted_by_shell",
+      "passed": true,
+      "project_id": "4a81cf84-c359-4ef9-a99f-aa9bb9d48c15",
+      "task_id": "62d710bb-e8c2-4252-9573-1ad9806b686b",
+      "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+      "status": "awaiting_review",
+      "verification": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": "Protected project files changed",
+        "acceptance": {
+          "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+          "policy_digest": "83b9a78a51130932b1ea3aadd757ed49270272bcc3eb2e8eb33f744be1ac9d18",
+          "candidate_digest": "8d078b40fda147c1cdf7be0693e98eb40c5fe6ffd235d468383283bcf1366868",
+          "passed": false,
+          "violations": [
+            {
+              "path": "tests/test_public.py",
+              "reason": "missing"
+            }
+          ],
+          "tests": {}
+        }
+      },
+      "accept_status": 409,
+      "seconds": 20.522
+    },
+    {
+      "name": "pytest_ini_bypass",
+      "passed": true,
+      "project_id": "4a81cf84-c359-4ef9-a99f-aa9bb9d48c15",
+      "task_id": "3a0e4cf3-338a-4324-9757-aca10bb2bdb8",
+      "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+      "status": "awaiting_review",
+      "verification": {
+        "exit_code": 1,
+        "stdout": "Trusted acceptance: collected=1, passed=0, failed=1, errors=0, skipped=0, xfailed=0, xpassed=0",
+        "stderr": "Trusted acceptance did not satisfy the fixed policy",
+        "acceptance": {
+          "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+          "policy_digest": "83b9a78a51130932b1ea3aadd757ed49270272bcc3eb2e8eb33f744be1ac9d18",
+          "candidate_digest": "05189d43ba3a625237816ba8cc96f12cb2640cec3582005766362f89ca8358e3",
+          "passed": false,
+          "violations": [],
+          "tests": {
+            "collected": 1,
+            "passed": 0,
+            "failed": 1,
+            "errors": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0
+          }
+        }
+      },
+      "accept_status": 409,
+      "seconds": 23.031
+    },
+    {
+      "name": "conftest_bypass",
+      "passed": true,
+      "project_id": "4a81cf84-c359-4ef9-a99f-aa9bb9d48c15",
+      "task_id": "c780cd67-157b-442b-851b-73721c538809",
+      "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+      "status": "awaiting_review",
+      "verification": {
+        "exit_code": 1,
+        "stdout": "Trusted acceptance: collected=1, passed=0, failed=1, errors=0, skipped=0, xfailed=0, xpassed=0",
+        "stderr": "Trusted acceptance did not satisfy the fixed policy",
+        "acceptance": {
+          "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+          "policy_digest": "83b9a78a51130932b1ea3aadd757ed49270272bcc3eb2e8eb33f744be1ac9d18",
+          "candidate_digest": "dc2fd04862d3f53293e1d9cb235fe41094be6c86248507cf51a3e47606f0fad1",
+          "passed": false,
+          "violations": [],
+          "tests": {
+            "collected": 1,
+            "passed": 0,
+            "failed": 1,
+            "errors": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0
+          }
+        }
+      },
+      "accept_status": 409,
+      "seconds": 23.037
+    },
+    {
+      "name": "pytest_module_bypass",
+      "passed": true,
+      "project_id": "4a81cf84-c359-4ef9-a99f-aa9bb9d48c15",
+      "task_id": "6091f17a-8760-496a-8d44-7dab71fe8d9a",
+      "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+      "status": "awaiting_review",
+      "verification": {
+        "exit_code": 1,
+        "stdout": "Trusted acceptance: collected=1, passed=0, failed=1, errors=0, skipped=0, xfailed=0, xpassed=0",
+        "stderr": "Trusted acceptance did not satisfy the fixed policy",
+        "acceptance": {
+          "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+          "policy_digest": "83b9a78a51130932b1ea3aadd757ed49270272bcc3eb2e8eb33f744be1ac9d18",
+          "candidate_digest": "1e51db988db877e90f13bcaedbd0d59c126d163799311d0842488df95a993f91",
+          "passed": false,
+          "violations": [],
+          "tests": {
+            "collected": 1,
+            "passed": 0,
+            "failed": 1,
+            "errors": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0
+          }
+        }
+      },
+      "accept_status": 409,
+      "seconds": 26.072
+    },
+    {
+      "name": "sitecustomize_bypass",
+      "passed": true,
+      "project_id": "4a81cf84-c359-4ef9-a99f-aa9bb9d48c15",
+      "task_id": "234e89fa-378b-481b-956a-d087516ef094",
+      "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+      "status": "awaiting_review",
+      "verification": {
+        "exit_code": 1,
+        "stdout": "Trusted acceptance: collected=1, passed=0, failed=1, errors=0, skipped=0, xfailed=0, xpassed=0",
+        "stderr": "Trusted acceptance did not satisfy the fixed policy",
+        "acceptance": {
+          "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+          "policy_digest": "83b9a78a51130932b1ea3aadd757ed49270272bcc3eb2e8eb33f744be1ac9d18",
+          "candidate_digest": "61d69b04dd0c7bd72f4b0bdc362fa21f2baac397e62d2feb27e6b2adfd040c70",
+          "passed": false,
+          "violations": [],
+          "tests": {
+            "collected": 1,
+            "passed": 0,
+            "failed": 1,
+            "errors": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0
+          }
+        }
+      },
+      "accept_status": 409,
+      "seconds": 25.988
+    },
+    {
+      "name": "fake_pass_stdout",
+      "passed": true,
+      "project_id": "4a81cf84-c359-4ef9-a99f-aa9bb9d48c15",
+      "task_id": "51403ab7-12ad-4deb-9b6e-823519259fe4",
+      "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+      "status": "awaiting_review",
+      "verification": {
+        "exit_code": 1,
+        "stdout": "Trusted acceptance: collected=1, passed=0, failed=1, errors=0, skipped=0, xfailed=0, xpassed=0",
+        "stderr": "Trusted acceptance did not satisfy the fixed policy",
+        "acceptance": {
+          "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+          "policy_digest": "83b9a78a51130932b1ea3aadd757ed49270272bcc3eb2e8eb33f744be1ac9d18",
+          "candidate_digest": "14912255ec9eee69a9208483d0b36d16fe9297fac11090b3501f082e4e4e7746",
+          "passed": false,
+          "violations": [],
+          "tests": {
+            "collected": 1,
+            "passed": 0,
+            "failed": 1,
+            "errors": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0
+          }
+        }
+      },
+      "accept_status": 409,
+      "seconds": 25.872
+    },
+    {
+      "name": "skipped_suite_refused",
+      "passed": true,
+      "project_id": "bf08591f-3fb5-45c8-b592-f7f9d97ba779",
+      "task_id": "7e377e1b-7b42-4af4-97d5-ad6f0dc4596b",
+      "suite_id": "ff6fe757-e357-4eb5-87da-ee0ab5152d79",
+      "status": "awaiting_review",
+      "verification": {
+        "exit_code": 1,
+        "stdout": "Trusted acceptance: collected=1, passed=0, failed=0, errors=0, skipped=1, xfailed=0, xpassed=0",
+        "stderr": "Trusted acceptance did not satisfy the fixed policy",
+        "acceptance": {
+          "suite_id": "ff6fe757-e357-4eb5-87da-ee0ab5152d79",
+          "policy_digest": "692b9d0523283077fbf4e45846e6e95c2f71ca947ad7c956710704c32b226258",
+          "candidate_digest": "5c89648d6ca67a8747aa6f6f9297ac90bd293b414f4630400eb67e361368ac46",
+          "passed": false,
+          "violations": [],
+          "tests": {
+            "collected": 1,
+            "passed": 0,
+            "failed": 0,
+            "errors": 0,
+            "skipped": 1,
+            "xfailed": 0,
+            "xpassed": 0
+          }
+        }
+      },
+      "accept_status": 409,
+      "seconds": 21.247
+    },
+    {
+      "name": "zero_tests_refused",
+      "passed": true,
+      "project_id": "d3fe4cb8-06ad-4ad1-9f23-9b38132a7b48",
+      "task_id": "1410ea03-8157-45cb-951e-83c9cf8d1948",
+      "suite_id": "bc1ea4cc-c7ac-4b76-9e1d-38569b81ea60",
+      "status": "awaiting_review",
+      "verification": {
+        "exit_code": 1,
+        "stdout": "Trusted acceptance: collected=0, passed=0, failed=0, errors=0, skipped=0, xfailed=0, xpassed=0",
+        "stderr": "Trusted acceptance did not satisfy the fixed policy",
+        "acceptance": {
+          "suite_id": "bc1ea4cc-c7ac-4b76-9e1d-38569b81ea60",
+          "policy_digest": "806871826c8c632aef0fa2253d03655bbb3eb78142a3560f4270102556d0120e",
+          "candidate_digest": "5c89648d6ca67a8747aa6f6f9297ac90bd293b414f4630400eb67e361368ac46",
+          "passed": false,
+          "violations": [],
+          "tests": {
+            "collected": 0,
+            "passed": 0,
+            "failed": 0,
+            "errors": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0
+          }
+        }
+      },
+      "accept_status": 409,
+      "seconds": 21.148
+    },
+    {
+      "name": "updated_policy_refuses_old_task",
+      "passed": true,
+      "project_id": "4a81cf84-c359-4ef9-a99f-aa9bb9d48c15",
+      "task_id": "e17e35b9-8486-4354-8691-e8d9165b3138",
+      "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+      "status": "awaiting_review",
+      "verification": {
+        "exit_code": 0,
+        "stdout": "Trusted acceptance: collected=1, passed=1, failed=0, errors=0, skipped=0, xfailed=0, xpassed=0\nProject tests:\n",
+        "stderr": "\n",
+        "acceptance": {
+          "suite_id": "36f0382e-8846-4562-a04a-cdd6eb8a1c29",
+          "policy_digest": "83b9a78a51130932b1ea3aadd757ed49270272bcc3eb2e8eb33f744be1ac9d18",
+          "candidate_digest": "5c89648d6ca67a8747aa6f6f9297ac90bd293b414f4630400eb67e361368ac46",
+          "passed": true,
+          "violations": [],
+          "tests": {
+            "collected": 1,
+            "passed": 1,
+            "failed": 0,
+            "errors": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0
+          }
+        },
+        "development_tests": {
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": "",
+          "truncated": false,
+          "duration": 0.003443,
+          "timed_out": false
+        }
+      },
+      "new_suite_id": "8bd2ad91-330c-45cd-90a8-c7ece5777d84",
+      "accept_status": 409,
+      "seconds": 29.799
+    },
+    {
+      "name": "correct_candidate_accepted",
+      "passed": true,
+      "project_id": "4a81cf84-c359-4ef9-a99f-aa9bb9d48c15",
+      "task_id": "30ac17bc-d188-4d3f-8c40-bcf73da0e18f",
+      "suite_id": "8bd2ad91-330c-45cd-90a8-c7ece5777d84",
+      "status": "awaiting_review",
+      "verification": {
+        "exit_code": 0,
+        "stdout": "Trusted acceptance: collected=1, passed=1, failed=0, errors=0, skipped=0, xfailed=0, xpassed=0\nProject tests:\n",
+        "stderr": "\n",
+        "acceptance": {
+          "suite_id": "8bd2ad91-330c-45cd-90a8-c7ece5777d84",
+          "policy_digest": "83b9a78a51130932b1ea3aadd757ed49270272bcc3eb2e8eb33f744be1ac9d18",
+          "candidate_digest": "5c89648d6ca67a8747aa6f6f9297ac90bd293b414f4630400eb67e361368ac46",
+          "passed": true,
+          "violations": [],
+          "tests": {
+            "collected": 1,
+            "passed": 1,
+            "failed": 0,
+            "errors": 0,
+            "skipped": 0,
+            "xfailed": 0,
+            "xpassed": 0
+          }
+        },
+        "development_tests": {
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": "",
+          "truncated": false,
+          "duration": 0.005302,
+          "timed_out": false
+        }
+      },
+      "accept_status": 200,
+      "seconds": 36.13
+    }
+  ],
+  "all_passed": true,
+  "finished_at": "2026-10-23T10:14:42.230327+00:00"
+}

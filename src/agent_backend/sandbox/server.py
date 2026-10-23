@@ -109,6 +109,10 @@ def create_app(manager: SandboxManager | None = None, token: str | None = None) 
             raise SandboxError("ARCHIVE_REQUIRED")
         return tool_result(await manager.tool(identity, "restore", payload))
 
+    @app.post("/workspaces/{identity}/verify")
+    async def verify(identity: str, request: Request):
+        return tool_result(await manager.verify(identity, await body(request)))
+
     @app.get("/workspaces/{identity}/archive")
     async def archive(identity: str):
         result = await manager.tool(identity, "archive", {})

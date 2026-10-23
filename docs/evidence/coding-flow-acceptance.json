@@ -1,0 +1,13 @@
+{
+  "baseline_failed": true,
+  "independent_verification_passed": true,
+  "test_side_effects_isolated": true,
+  "followup_preserves_full_diff": true,
+  "accept_advances_version": true,
+  "stale_accept_409": true,
+  "late_source_409": true,
+  "completion_idempotent": true,
+  "sse_replay": true,
+  "unsafe_archive_failed": true,
+  "real_model_calls": 0
+}

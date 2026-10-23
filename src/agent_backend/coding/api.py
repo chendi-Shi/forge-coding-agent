@@ -26,6 +26,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agent_backend.coding.broker import broker, tool
 from agent_backend.coding.models import Event, Executor, Project, Task, ToolOperation, now
 from agent_backend.coding.sample import SAMPLE_FILES, SAMPLE_PROMPT, SAMPLE_TEST
+from agent_backend.coding.verification import (
+    AcceptanceSuite,
+    AcceptanceSuiteCreate,
+    acceptance_gate,
+    archive_files,
+    content_digest,
+    create_suite,
+    suite_public,
+    verify_suite,
+)
 from agent_backend.settings import identity_from_header
 
 router = APIRouter(prefix="/api/coding", tags=["Coding Agent"])
@@ -110,6 +120,25 @@ async def verify_workspace(workspace_id, command):
             # A cleanup outage must not mask the actual verification result.
             import logging
             logging.getLogger(__name__).warning("Verification workspace cleanup failed: %s", verification_id)
+
+
+async def verify_task_workspace(session, task, workspace_id):
+    """Pinned acceptance is mandatory even if a task overrides its dev command."""
+    suite_id = getattr(task, "acceptance_suite_id", None)
+    if not suite_id:
+        return await verify_workspace(workspace_id, task.test_command)
+    suite = await owned(session, AcceptanceSuite, suite_id, task.owner)
+    if suite.project_id != task.project_id or suite.digest != task.acceptance_suite_digest:
+        raise HTTPException(409, "Pinned acceptance suite does not match this task")
+    result = await verify_suite(workspace_id, suite)
+    if task.test_command and result.get("exit_code") == 0:
+        development = await verify_workspace(workspace_id, task.test_command)
+        result["development_tests"] = development
+        if development.get("exit_code") != 0:
+            result["exit_code"] = development.get("exit_code") if development.get("exit_code") is not None else 1
+        result["stdout"] = (result.get("stdout", "") + "\nProject tests:\n" + development.get("stdout", ""))[-64000:]
+        result["stderr"] = (result.get("stderr", "") + "\n" + development.get("stderr", ""))[-16000:]
+    return result
 
 
 class ProjectCreate(BaseModel):
@@ -246,6 +275,14 @@ async def create_project(body: ProjectCreate, owner=Depends(identity), session: 
 @router.post("/projects/sample", status_code=201)
 async def sample(owner=Depends(identity), session: AsyncSession = Depends(get_session)):
     project = await create_project(ProjectCreate(name="订单金额计算 · Python", files=SAMPLE_FILES, test_command=SAMPLE_TEST), owner, session)
+    row = await owned(session, Project, project["id"], owner, lock=True)
+    suite = await create_suite(session, row, AcceptanceSuiteCreate(
+        name="订单金额独立回归", files={"test_order_acceptance.py": SAMPLE_FILES["tests/test_orders.py"]},
+        test_paths=["test_order_acceptance.py"], protected_paths=["tests/test_orders.py"], minimum_tests=5,
+    ))
+    row.acceptance_suite_id = suite.id
+    await session.commit()
+    project = public(row)
     return {**project, "suggested_prompt": SAMPLE_PROMPT}
 
 
@@ -261,6 +298,24 @@ async def project_file(project_id: UUID, path: str, owner=Depends(identity), ses
     return await tool(project.workspace_id, "read_file", {"path": path})
 
 
+@router.get("/projects/{project_id}/acceptance-suites")
+async def acceptance_suites(project_id: UUID, owner=Depends(identity), session: AsyncSession = Depends(get_session)):
+    project = await owned(session, Project, project_id, owner)
+    rows = await session.scalars(select(AcceptanceSuite).where(
+        AcceptanceSuite.project_id == project.id, AcceptanceSuite.owner == owner,
+    ).order_by(AcceptanceSuite.version.desc()))
+    return {"active_suite_id": project.acceptance_suite_id, "suites": [suite_public(row) for row in rows]}
+
+
+@router.post("/projects/{project_id}/acceptance-suites", status_code=201)
+async def register_acceptance_suite(project_id: UUID, body: AcceptanceSuiteCreate, owner=Depends(identity), session: AsyncSession = Depends(get_session)):
+    project = await owned(session, Project, project_id, owner, lock=True)
+    suite = await create_suite(session, project, body)
+    project.acceptance_suite_id = suite.id
+    await session.commit()
+    return suite_public(suite)
+
+
 @router.post("/tasks", status_code=201)
 async def create_task(body: TaskCreate, owner=Depends(identity), session: AsyncSession = Depends(get_session)):
     # Serializes admission per identity across API replicas.
@@ -269,7 +324,8 @@ async def create_task(body: TaskCreate, owner=Depends(identity), session: AsyncS
         existing = await session.scalar(select(Task).where(Task.owner == owner, Task.client_request_id == str(body.client_request_id)))
         if existing:
             return public(existing)
-    project = await owned(session, Project, body.project_id, owner)
+    project = await owned(session, Project, body.project_id, owner, lock=True)
+    pinned_suite = await owned(session, AcceptanceSuite, project.acceptance_suite_id, owner) if project.acceptance_suite_id else None
     parent = None
     if body.parent_task_id:
         parent = await owned(session, Task, body.parent_task_id, owner)
@@ -288,9 +344,12 @@ async def create_task(body: TaskCreate, owner=Depends(identity), session: AsyncS
         client_request_id=str(body.client_request_id) if body.client_request_id else None,
         parent_task_id=parent.id if parent else None, seed_workspace_id=parent.id if parent else None,
         engine=body.engine,
+        acceptance_suite_id=pinned_suite.id if pinned_suite else None,
+        acceptance_suite_digest=pinned_suite.digest if pinned_suite else None,
     )
     session.add(task)
-    await record(session, task.id, "task.queued", {"project_version": project.version, "engine": task.engine})
+    await record(session, task.id, "task.queued", {"project_version": project.version, "engine": task.engine,
+                                               "acceptance_suite_id": task.acceptance_suite_id, "acceptance_suite_digest": task.acceptance_suite_digest})
     await session.commit()
     return public(task)
 
@@ -335,6 +394,20 @@ async def accept(task_id: UUID, owner=Depends(identity), session: AsyncSession =
         raise HTTPException(409, "Project has changed since this task started. Download its patch or create a new task on the latest version.")
     if task.verification and task.verification.get("exit_code") != 0:
         raise HTTPException(409, "Independent tests failed. Fix the task before accepting it.")
+    if not task.acceptance_suite_id or not project.acceptance_suite_id:
+        raise HTTPException(409, "ACCEPTANCE_SUITE_REQUIRED: configure a suite and create a new task before accepting changes")
+    suite = await owned(session, AcceptanceSuite, task.acceptance_suite_id, owner)
+    if suite.project_id != project.id or suite.digest != task.acceptance_suite_digest:
+        raise HTTPException(409, "Acceptance policy does not match the task")
+    candidate = await broker("GET", f"/workspaces/{task.id}/archive", raw=True)
+    gate = acceptance_gate(
+        task_status=task.status, task_suite_id=task.acceptance_suite_id,
+        active_suite_id=project.acceptance_suite_id, suite_digest=task.acceptance_suite_digest,
+        candidate_digest=content_digest(archive_files(candidate)), verification=task.verification,
+        minimum_tests=suite.policy["minimum_tests"],
+    )
+    if not gate["allowed"]:
+        raise HTTPException(409, "Acceptance refused: " + gate["code"])
     # Immutable snapshots: accepting advances a DB pointer, never overwrites
     # a host checkout or a concurrently executing task's files.
     project.workspace_id, project.version = task.id, project.version + 1
@@ -463,7 +536,7 @@ async def source(task_id: UUID, x_lease_token: str = Header(default=""), owner=D
         leased(task, x_lease_token)
         if task.status != "running" or task.cancel_requested:
             raise HTTPException(409, "Source requires a running task without cancellation")
-        if task.workspace_ready and task.test_command and task.baseline_test is None:
+        if task.workspace_ready and (task.test_command or getattr(task, "acceptance_suite_id", None)) and task.baseline_test is None:
             # Older deployments could publish readiness before recording the
             # baseline. The task or its failed parent may since have changed.
             raise HTTPException(409, "Initial baseline unavailable for this existing workspace; create a follow-up instead of reconstructing it from modified files")
@@ -497,7 +570,7 @@ async def source(task_id: UUID, x_lease_token: str = Header(default=""), owner=D
             await broker("POST", f"/workspaces/{initial_id}/tools", json={"name": "get_diff", "arguments": {"max_output": 1}})
             await broker("POST", f"/workspaces/{task.source_workspace_id}/fork", json={"workspace_id": task.id})
             await broker("POST", f"/workspaces/{task.id}/restore", json={"archive_base64": base64.b64encode(initial).decode()})
-            baseline = await verify_workspace(initial_id, task.test_command) if task.test_command else None
+            baseline = await verify_task_workspace(session, task, initial_id) if task.test_command or getattr(task, "acceptance_suite_id", None) else None
             # Never publish a workspace before its baseline result is durable,
             # or let a cancelled/expired/replaced lease publish late results.
             with session.no_autoflush:
@@ -556,10 +629,11 @@ async def complete(task_id: UUID, body: Completion, owner=Depends(identity), ses
             changes = await broker("GET", f"/workspaces/{task.id}/diff")
         elif body.exit_code == 0:
             raise HTTPException(422, "Successful completion requires a workspace archive")
-        if body.exit_code == 0 and task.test_command:
-            await record(session, task.id, "test.started", {"command": task.test_command, "environment": "isolated Docker; network disabled"})
+        if body.exit_code == 0 and (task.test_command or getattr(task, "acceptance_suite_id", None)):
+            await record(session, task.id, "test.started", {"command": task.test_command, "environment": "isolated Docker; network disabled",
+                                                          "acceptance_suite_id": getattr(task, "acceptance_suite_id", None)})
             await session.commit()
-            verification = await verify_workspace(task.id, task.test_command)
+            verification = await verify_task_workspace(session, task, task.id)
     except HTTPException as exc:
         failure = str(exc.detail)
     # Keep external results out of the identity map until the control fields

@@ -1,0 +1,193 @@
+{
+  "ok": true,
+  "real_model_calls": 0,
+  "checks": [
+    {
+      "name": "passing_suite_and_readonly_mount",
+      "passed": true,
+      "accepted": true,
+      "tests": {
+        "collected": 2,
+        "passed": 2,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0
+      },
+      "candidate_unchanged": true,
+      "exit_code": 0,
+      "timed_out": false,
+      "unsupported_reason": null
+    },
+    {
+      "name": "delete_hidden_test_is_rejected",
+      "passed": true,
+      "accepted": false,
+      "tests": {
+        "collected": 0,
+        "passed": 0,
+        "failed": 0,
+        "errors": 1,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0
+      },
+      "candidate_unchanged": true,
+      "exit_code": 2,
+      "timed_out": false,
+      "unsupported_reason": null
+    },
+    {
+      "name": "repository_config_and_conftest_cannot_skip",
+      "passed": true,
+      "accepted": false,
+      "tests": {
+        "collected": 1,
+        "passed": 0,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0
+      },
+      "candidate_unchanged": true,
+      "exit_code": 1,
+      "timed_out": false,
+      "unsupported_reason": null
+    },
+    {
+      "name": "fake_stdout_cannot_report_success",
+      "passed": true,
+      "accepted": false,
+      "tests": {
+        "collected": 1,
+        "passed": 0,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0
+      },
+      "candidate_unchanged": true,
+      "exit_code": 1,
+      "timed_out": false,
+      "unsupported_reason": null
+    },
+    {
+      "name": "zero_tests_fail_closed",
+      "passed": true,
+      "accepted": false,
+      "tests": {
+        "collected": 0,
+        "passed": 0,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0
+      },
+      "candidate_unchanged": true,
+      "exit_code": 5,
+      "timed_out": false,
+      "unsupported_reason": null
+    },
+    {
+      "name": "skipped_tests_fail_closed",
+      "passed": true,
+      "accepted": false,
+      "tests": {
+        "collected": 1,
+        "passed": 0,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 1,
+        "xfailed": 0,
+        "xpassed": 0
+      },
+      "candidate_unchanged": true,
+      "exit_code": 1,
+      "timed_out": false,
+      "unsupported_reason": null
+    },
+    {
+      "name": "xfail_tests_fail_closed",
+      "passed": true,
+      "accepted": false,
+      "tests": {
+        "collected": 1,
+        "passed": 0,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "xfailed": 1,
+        "xpassed": 0
+      },
+      "candidate_unchanged": true,
+      "exit_code": 1,
+      "timed_out": false,
+      "unsupported_reason": null
+    },
+    {
+      "name": "xpass_tests_fail_closed",
+      "passed": true,
+      "accepted": false,
+      "tests": {
+        "collected": 1,
+        "passed": 0,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 1
+      },
+      "candidate_unchanged": true,
+      "exit_code": 1,
+      "timed_out": false,
+      "unsupported_reason": null
+    },
+    {
+      "name": "command_timeout_fails_closed",
+      "passed": true,
+      "accepted": false,
+      "tests": {
+        "collected": 0,
+        "passed": 0,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0
+      },
+      "candidate_unchanged": true,
+      "exit_code": -9,
+      "timed_out": true,
+      "unsupported_reason": null
+    },
+    {
+      "name": "image_import_collision_is_unsupported",
+      "passed": true,
+      "accepted": false,
+      "tests": {
+        "collected": 0,
+        "passed": 0,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0
+      },
+      "candidate_unchanged": true,
+      "exit_code": 2,
+      "timed_out": false,
+      "unsupported_reason": "import_collision:json"
+    }
+  ],
+  "boundary": "Read-only suite and fixed pytest policy; not protection against malicious Python tampering within the pytest process.",
+  "cleanup": {
+    "source_delete_failures": [],
+    "remaining_source_or_verification_volumes": []
+  },
+  "passed": 10,
+  "duration_seconds": 56.89
+}

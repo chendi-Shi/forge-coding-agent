@@ -24,6 +24,7 @@ def create_app():
     from agent_backend.coding.api import router as coding_router
     from agent_backend.concurrency import integrity_error_response
     from agent_backend.forge.api import router as forge_router
+    from agent_backend.forge.artifacts import router as artifacts_router
 
     backend_auth = get_auth_instance()
     if backend_auth is None or not getattr(backend_auth, "_authenticate_handler", None):
@@ -32,6 +33,7 @@ def create_app():
     aegra_app.add_exception_handler(IntegrityError, integrity_error_response)
     aegra_app.include_router(coding_router)
     aegra_app.include_router(forge_router)
+    aegra_app.include_router(artifacts_router)
     studio = Path(__file__).parent / "studio"
     if studio.is_dir():
         aegra_app.mount("/studio/static", StaticFiles(directory=studio), name="coding-studio")

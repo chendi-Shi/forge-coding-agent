@@ -45,7 +45,11 @@ def truncate_text(text: str, max_tokens: int, *, tail: bool = False) -> str:
 
 
 class ArtifactStore(Protocol):
-    """Implement put idempotently; authorization and persistence belong to the caller."""
+    """Implement put idempotently; authorization and persistence belong to the caller.
+
+    A buffering implementation may stage synchronously here, but its caller must
+    flush durable bytes before publishing a checkpoint containing the reference.
+    """
 
     def put(self, text: str, kind: str) -> str: ...
 

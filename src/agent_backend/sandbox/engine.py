@@ -17,6 +17,8 @@ from weakref import WeakValueDictionary
 
 import httpx
 
+from .acceptance_runner import validate_verify
+
 OWNER_LABEL = "agent-backend.sandbox"
 WORKSPACE_LABEL = "agent-backend.workspace-id"
 SOURCE_LABEL = "agent-backend.source-workspace-id"
@@ -74,6 +76,26 @@ def input_tar(payload: dict[str, Any]) -> bytes:
         info = tarfile.TarInfo("request.json")
         info.size, info.uid, info.gid, info.mode = len(content), 10001, 10001, 0o600
         archive.addfile(info, io.BytesIO(content))
+    return buffer.getvalue()
+
+
+def acceptance_tar(files: dict[str, str]) -> bytes:
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w") as archive:
+        directories = set()
+        for name in sorted(files):
+            parts = name.split("/")
+            for length in range(1, len(parts)):
+                directory = "/".join(parts[:length])
+                if directory not in directories:
+                    info = tarfile.TarInfo(directory)
+                    info.type, info.mode = tarfile.DIRTYPE, 0o755
+                    archive.addfile(info)
+                    directories.add(directory)
+            data = files[name].encode("utf-8")
+            info = tarfile.TarInfo(name)
+            info.size, info.mode = len(data), 0o444
+            archive.addfile(info, io.BytesIO(data))
     return buffer.getvalue()
 
 
@@ -210,14 +232,33 @@ class SandboxManager:
             await self.request("DELETE", "/volumes/" + volume_name(identity))
             return {"workspace_id": identity, "deleted": True}
 
-    async def execute(self, identity: str, payload: dict[str, Any]) -> dict[str, Any]:
-        duration = validate_command(payload["arguments"]) if payload["name"] == "run_command" else 60.0
+    async def verify(self, identity: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        identity = workspace_id(identity)
+        try:
+            options = validate_verify(arguments)
+        except (ValueError, UnicodeError):
+            raise SandboxError("INVALID_ACCEPTANCE_SUITE") from None
+        temporary = str(uuid4())
+        try:
+            await self.fork(identity, temporary)
+            async with self.lock(temporary):
+                return await self.execute(temporary, {"name": "verify", "arguments": options}, acceptance=arguments["files"])
+        finally:
+            with suppress(SandboxError):
+                await self.delete(temporary)
+
+    async def execute(self, identity: str, payload: dict[str, Any], *, acceptance: dict[str, str] | None = None) -> dict[str, Any]:
+        duration = (payload["arguments"]["timeout_seconds"] if acceptance is not None
+                    else validate_command(payload["arguments"]) if payload["name"] == "run_command" else 60.0)
         upload = input_tar(payload)
         async with self.slots:
             execution_id = uuid4().hex
             input_volume = "agent-backend-input-" + execution_id
+            acceptance_volume = "agent-backend-input-" + uuid4().hex if acceptance is not None else None
             container_id: str | None = None
+            upload_container: str | None = None
             input_created = False
+            acceptance_created = False
             deadline = time.time() + duration + 90
             started = time.monotonic()
             try:
@@ -226,8 +267,24 @@ class SandboxManager:
                     raise SandboxError("SANDBOX_IMAGE_NOT_AVAILABLE", 503)
                 await self.request("POST", "/volumes/create", json={"Name": input_volume, "Labels": {OWNER_LABEL: "true", ROLE_LABEL: "input", DEADLINE_LABEL: str(deadline)}})
                 input_created = True
-                policy = container_policy(image, volume_name(identity), input_volume, identity, deadline, command=payload["name"] == "run_command")
+                policy = container_policy(image, volume_name(identity), input_volume, identity, deadline, command=payload["name"] in {"run_command", "verify"})
                 policy["Labels"]["agent-backend.input-volume"] = input_volume
+                if acceptance_volume is not None:
+                    await self.request("POST", "/volumes/create", json={"Name": acceptance_volume, "Labels": {OWNER_LABEL: "true", ROLE_LABEL: "input", DEADLINE_LABEL: str(deadline)}})
+                    acceptance_created = True
+                    suite_mount = {"Type": "volume", "Source": acceptance_volume, "Target": "/acceptance", "ReadOnly": False}
+                    policy["HostConfig"]["Mounts"].append(suite_mount)
+                    # Docker cannot PUT an archive into a read-only mount. Populate
+                    # the isolated volume through a stopped container, remove that
+                    # container, then mount it read-only in the execution container.
+                    staged = await self.request("POST", "/containers/create", params={"name": "agent-backend-suite-" + execution_id}, json=policy)
+                    upload_container = staged.json().get("Id")
+                    if not isinstance(upload_container, str) or not re.fullmatch(r"[0-9a-f]{64}", upload_container):
+                        raise SandboxError("INVALID_CONTAINER_ID", 503)
+                    await self.request("PUT", f"/containers/{upload_container}/archive", params={"path": "/acceptance"}, headers={"Content-Type": "application/x-tar"}, content=acceptance_tar(acceptance), timeout=30)
+                    await self.request("DELETE", f"/containers/{upload_container}", params={"force": "true"}, allowed={404})
+                    upload_container = None
+                    suite_mount["ReadOnly"] = True
                 # The Engine's unique name is a second lock across broker restarts.
                 # An abandoned container blocks reuse until its deadline janitor
                 # removes it, so two processes cannot mutate one workspace.
@@ -262,12 +319,18 @@ class SandboxManager:
                     raise SandboxError("INVALID_SANDBOX_RESULT", 502)
                 return result
             finally:
+                if upload_container is not None and re.fullmatch(r"[0-9a-f]{64}", upload_container):
+                    with suppress(SandboxError):
+                        await self.request("DELETE", f"/containers/{upload_container}", params={"force": "true"}, allowed={404})
                 if container_id is not None and re.fullmatch(r"[0-9a-f]{64}", container_id):
                     with suppress(SandboxError):
                         await self.request("DELETE", f"/containers/{container_id}", params={"force": "true"}, allowed={404})
                 if input_created:
                     with suppress(SandboxError):
                         await self.request("DELETE", "/volumes/" + input_volume, allowed={404, 409})
+                if acceptance_created:
+                    with suppress(SandboxError):
+                        await self.request("DELETE", "/volumes/" + acceptance_volume, allowed={404, 409})
 
     async def reap(self) -> None:
         """Remove only expired execution containers/input volumes; retain workspaces."""

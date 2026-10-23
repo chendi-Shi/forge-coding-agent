@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -27,6 +27,7 @@ class Project(CodingBase):
     source: Mapped[str] = mapped_column(Text, default="upload")
     test_command: Mapped[str] = mapped_column(Text, default="")
     version: Mapped[int] = mapped_column(Integer, default=1)
+    acceptance_suite_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
@@ -49,6 +50,8 @@ class Task(CodingBase):
     model: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
     test_command: Mapped[str] = mapped_column(Text, default="")
+    acceptance_suite_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    acceptance_suite_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
     timeout_seconds: Mapped[int] = mapped_column(Integer, default=900)
     client_request_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     executor_id: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -98,3 +101,14 @@ class ToolOperation(CodingBase):
     result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Artifact(CodingBase):
+    __tablename__ = "forge_artifacts"
+    task_id: Mapped[str] = mapped_column(String(36), ForeignKey("coding_tasks.id", ondelete="CASCADE"), primary_key=True)
+    artifact_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(64))
+    sha256: Mapped[str] = mapped_column(String(64))
+    byte_length: Mapped[int] = mapped_column(Integer)
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

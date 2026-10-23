@@ -1,0 +1,72 @@
+{
+  "case": "cachetools-autospec",
+  "source_archive_url": "https://codeload.github.com/tkem/cachetools/zip/eba200635273fe45b67e669b84cb45f995b27c24",
+  "parent_sha": "eba200635273fe45b67e669b84cb45f995b27c24",
+  "source_archive_sha256": "6c1a2102793144f7c387189215c9c3ee7f4439316be28d170058a9f736d30985",
+  "project_zip_sha256": "2c64180ee9e78de1829c2faad9aae76e5d56c60524f60b4be45a857fc765123d",
+  "project_file_count": 32,
+  "project_expanded_bytes": 238571,
+  "excluded_paths": [
+    ".github/FUNDING.yml",
+    ".github/ISSUE_TEMPLATE/bug_report.md",
+    ".github/ISSUE_TEMPLATE/config.yml",
+    ".github/ISSUE_TEMPLATE/feature_request.md",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    ".github/SECURITY.md",
+    ".github/copilot-instructions.md",
+    ".github/copilot-review.md",
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".readthedocs.yaml"
+  ],
+  "files": {
+    "CHANGELOG.rst": "3a2c503a66ae00afa987c7edd371624e5fbe7cb6d2eb826f0dc8ffc3455e3683",
+    "LICENSE": "28c000b52b0ee27138a68ef778227e4057046e86b65f62f1cacb99b0cc49e0d2",
+    "MANIFEST.in": "112a66627a754e7be3084a4abec44998dfbe3c4e9515fca8fa38661e11800568",
+    "README.rst": "b44071bcf42e41215188219203da345d48358acba735ef272b2bba8b7f2a3652",
+    "docs/conf.py": "f68affa8dfcf4a20d5fe872cfb0e19f9b284f8feda563dd8e8e23eafe75cd4eb",
+    "docs/index.rst": "3158547980de18c94a5dabcad2b2f94753d759cb8cff10104cccde51e5edab47",
+    "pyproject.toml": "184b810289d47b8849192a67933a4a9e8147c5ed999afe9038e485923b6466c2",
+    "src/cachetools/__init__.py": "fc1fc822b9a6b3c9c626740ede6255875d1a10b24e29161d753ee02895145df8",
+    "src/cachetools/__init__.pyi": "3c584c6cec8627b81cc73ba08b574346245970e46ba8a8986fca2cbfcd211976",
+    "src/cachetools/_cached.py": "f5c72f55adea90b993e76f08823dc433cfcf239028258ece91a678d41cd3af54",
+    "src/cachetools/_cachedmethod.py": "fab3db052680d7b779e5ccbf3a91247419e40eed95c438a2fbb527f43a9f9978",
+    "src/cachetools/_descriptor.py": "9d568a91f4e39dab85bfbbc49b091a03f5832ff8dbfcdc848107f797ef80d99d",
+    "src/cachetools/func.py": "87724e4fc82303fd5172cc9fd03c7aaf6a767c6c477f3cb74a245fc45ebf7816",
+    "src/cachetools/func.pyi": "52237fae3e6e3f4c7103087eca0a9f49ebdc1297c459e2267639a6b9f50e1258",
+    "src/cachetools/keys.py": "9550bd6914744c2fc6fd211dfb83cdae2d6206b1a1bfcf052d017cb23b39b49e",
+    "src/cachetools/keys.pyi": "594a1166a9c399a375b6095ee1b38408f44b7d7c8b7b57685caab85b4598a24c",
+    "src/cachetools/py.typed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tests/__init__.py": "f69e96bf58cad616efa2cf53748ab54bed45afd8a2b716d33f2a5dc9c6830c29",
+    "tests/test_cache.py": "dbdf81b02f344a0e62a5dcf2364be7e135e2511e765e93b43864aeb7aa3b115c",
+    "tests/test_cached.py": "be8c08bc22e3f321ac63cabc3f538fab26b456bbd38af650f1941f0ad5b5e2eb",
+    "tests/test_cachedmethod.py": "0eb820797195179c3f6ac83c1212b9318d2b48bd73812c38e7e9e8ebac06270b",
+    "tests/test_classmethod.py": "465e882cf15481277cef959eb5d4ec0072d61c342079cac05684da55fe543851",
+    "tests/test_fifo.py": "c6134627b4d9daab20e67b27fe2ff8d7e225116ae46d6a0e79b2c9b620d25941",
+    "tests/test_func.py": "f9dc6bc1aaffa713ee17ce7d307ea56e483f782d61fda795d1d3c8689e8afe51",
+    "tests/test_keys.py": "c6e39d6e781cb737159b43d725c4a0f00ce6f2885376fb6efd01c5d59e196064",
+    "tests/test_lfu.py": "11981704035d965ae733140734efb7cd30615ef492cfeeb464f63992db59b404",
+    "tests/test_lru.py": "dbfd53eb372f24571f70d739faeb6c4963f79c80ef18228f44b38b1112bf1a6c",
+    "tests/test_rr.py": "995ee7555ebe96c8b4f988c23a8923de980b5f0c42ca073906988e28dd773ec2",
+    "tests/test_threading.py": "e423f7033368b980ec1455732d4c77d93d614779cd17aae43dfdfb747d0d0352",
+    "tests/test_tlru.py": "461fd80337d3e4a7fba830b30765cce19666611f797568f18740e4f6eea98199",
+    "tests/test_ttl.py": "3b64a202fbeeb877f52fd0ffc8735400bfdf3eb6302ecd9da77086b53371e145",
+    "tox.ini": "ca2be656d1b20d7731eb8bcd303df16893878ee2bdd95ef93e77a3c595411a52"
+  },
+  "hidden_oracle_sha256": "52a557c5affe2393c7ecd735c633ead3a94543d5ae1437d1b00acb8101a95451",
+  "task_description_sha256": "0593aa69cec259451b9cf90a65e4ebb9d2c31e992c1af1401586628894f4c3ac",
+  "reference_source_git_blob": "596483aaf6753e5e3178ce8340f0f60db03260bc",
+  "visibility": {
+    "agent": [
+      "project.zip",
+      "task.md"
+    ],
+    "evaluator_only": [
+      "oracle/",
+      "provenance.json",
+      "source_manifest.json",
+      "verification.json"
+    ]
+  }
+}

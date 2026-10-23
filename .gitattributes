@@ -1,0 +1,3 @@
+# Preserve exact bytes: frozen upstream sources and evaluation hashes must
+# survive a Windows/Linux clone without Git changing line endings.
+* -text

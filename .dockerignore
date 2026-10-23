@@ -1,0 +1,13 @@
+.env
+.venv
+.git
+__pycache__
+.pytest_cache
+.ruff_cache
+results
+*.egg-info
+.coding-workspaces
+.forge-workspaces
+.coding-worker*
+.runtime.json
+README.local.md

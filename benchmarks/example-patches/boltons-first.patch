@@ -1,0 +1,59 @@
+diff --git a/boltons/statsutils.py b/boltons/statsutils.py
+index b00fa09..124d59f 100644
+--- a/boltons/statsutils.py
++++ b/boltons/statsutils.py
+@@ -465,6 +465,8 @@ class Stats:
+                     return 7
+         elif round(c2, precision) == 0:
+             return 3  # Gamma
++        elif c0 == 0:
++            return 1  # Beta: the Pearson criterion is undefined at this boundary.
+         else:
+             k = c1 ** 2 / (4 * c0 * c2)
+             if k < 0:
+diff --git a/tests/test_statsutils_pearson_boundary.py b/tests/test_statsutils_pearson_boundary.py
+new file mode 100644
+index 0000000..5bdada2
+--- /dev/null
++++ b/tests/test_statsutils_pearson_boundary.py
+@@ -0,0 +1,40 @@
++import math
++
++import pytest
++
++from boltons.statsutils import Stats
++
++
++@pytest.mark.parametrize('sign', [1, -1])
++@pytest.mark.parametrize('skewness,kurtosis,expected', [
++    (2.0, 3.0, 1),  # Exact c0 == 0 boundary.
++    (0.0, 3.0, 0),  # Normal.
++    (0.0, 2.0, 2),  # Symmetric Beta.
++    (0.0, 4.0, 7),  # Symmetric Type VII.
++    (1.0, 4.5, 3),  # Gamma.
++    (1.0, 3.0, 1),  # Ordinary Type I.
++    (3.0, 3.0, 4),  # k = 0.2 remains Type IV at default precision 0.
++    (math.sqrt(5.0), 3.0, 5),
++    (math.sqrt(4.5), 3.0, 6),
++])
++def test_pearson_families(sign, skewness, kurtosis, expected):
++    stats = Stats([0])
++    stats.skewness = sign * skewness
++    stats.kurtosis = kurtosis
++    assert stats.pearson_type == expected
++
++
++@pytest.mark.parametrize('skewness,kurtosis,precision,expected', [
++    (0.00001, 3.0001, 3, 0),
++    (1.0, 4.5001, 3, 3),
++    (math.sqrt(5.0001), 3.0, 3, 5),
++    (math.sqrt(5.0001), 3.0, 6, 4),
++    (2.0, 3.00001, 3, 1),
++    (2.0, 2.99999, 3, 6),
++])
++def test_pearson_rounding(skewness, kurtosis, precision, expected):
++    stats = Stats([0])
++    stats.skewness = skewness
++    stats.kurtosis = kurtosis
++    stats._pearson_precision = precision
++    assert stats.pearson_type == expected

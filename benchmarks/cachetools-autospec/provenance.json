@@ -1,0 +1,33 @@
+{
+  "id": "cachetools-autospec",
+  "repository": "tkem/cachetools",
+  "issue_url": "https://github.com/tkem/cachetools/issues/443",
+  "issue_title": "@cachedmethod decorator breaks mock autospec",
+  "issue_created_at": "2026-10-19T13:46:57Z",
+  "parent_sha": "eba200635273fe45b67e669b84cb45f995b27c24",
+  "fix_sha": "95e6addbd82afd75f81cb5650f32f6d74af2f1f9",
+  "fix_url": "https://github.com/tkem/cachetools/commit/95e6addbd82afd75f81cb5650f32f6d74af2f1f9",
+  "fixed_at": "2026-10-19T17:13:58Z",
+  "verified_parent": true,
+  "provenance_method": "GitHub connector github_fetch_commit, github_fetch_issue, github_fetch_file and REST commit metadata",
+  "license": {
+    "spdx": "MIT",
+    "path": "LICENSE",
+    "git_blob_sha": "f980a19c78c25959f922b8cc93854d91a89e686f",
+    "url": "https://github.com/tkem/cachetools/blob/eba200635273fe45b67e669b84cb45f995b27c24/LICENSE"
+  },
+  "reference_files": [
+    {
+      "path": "src/cachetools/_descriptor.py",
+      "git_blob_sha": "596483aaf6753e5e3178ce8340f0f60db03260bc",
+      "url": "https://github.com/tkem/cachetools/raw/95e6addbd82afd75f81cb5650f32f6d74af2f1f9/src%2Fcachetools%2F_descriptor.py"
+    }
+  ],
+  "upstream_regression_files": [
+    "tests/test_cachedmethod.py"
+  ],
+  "oracle": "Independently authored black-box regression tests based on issue443 and Python unittest.mock public behavior; reference implementation is not copied into oracle",
+  "visible_test_command": "python -m pytest -q -o pythonpath=src tests/test_cachedmethod.py",
+  "collected_at": "2026-10-23"
+}
+

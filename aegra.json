@@ -1,0 +1,8 @@
+{
+  "graphs": {
+    "agent": "./src/agent_backend/graph.py:graph"
+  },
+  "auth": {
+    "path": "./src/agent_backend/auth.py:auth"
+  }
+}

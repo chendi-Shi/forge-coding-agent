@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "boltons-pearson",
+  "repository": "https://github.com/mahmoud/boltons",
+  "issue_or_pull_request": "https://github.com/mahmoud/boltons/pull/434",
+  "review_evidence": "https://github.com/mahmoud/boltons/pull/434#pullrequestreview-4886698209",
+  "base_commit": "3913220988e1e7c80620796fdcb4f74eb598d179",
+  "reference_commit": "73e22c90de25aaae3e6aed57f7438ffe57349339",
+  "source_file": "boltons/statsutils.py",
+  "base_source_blob_sha": "b00fa0974b6624154d90f25dd90172a4bb6c8a7f",
+  "reference_source_blob_sha": "abf5e09a5ccc68e53b1bdd78b153a7d7c4e64f1f",
+  "license": "BSD-3-Clause",
+  "license_url": "https://github.com/mahmoud/boltons/blob/3913220988e1e7c80620796fdcb4f74eb598d179/LICENSE",
+  "license_blob_sha": "6a4c9d2496f53c61c99ae7c113e6ed94b15b038c",
+  "verified_via": "GitHub plugin fetch_file, fetch_commit and fetch_pr; immutable refs",
+  "visible_test_command": "python -m pytest -q tests/test_statsutils.py",
+  "hidden_test_command": "python -m pytest -q /oracle/test_regression.py",
+  "oracle_case_count": 16,
+  "notes": [
+    "The base is the merged PR #434 version; IV/V/VI were already implemented there. The remaining reviewed defect is the exact zero denominator, addressed by the subsequent reference commit.",
+    "Exact-moment boundary tests set Stats.skewness and Stats.kurtosis on Stats([0]), following the upstream maintainer's deterministic regression technique. They are public-attribute boundary fixtures, not randomly sampled empirical distributions.",
+    "For real skewness, c0=0 implies c2=-1.5*skewness**2-6<0. The positive-c2 exact-zero defensive branch is therefore not claimed covered; no custom numeric stub or fabricated sample is used.",
+    "The three ordinary sample vectors have fixed expected Type IV, V and VI classifications; mirrored values are also checked.",
+    "Oracle is independently maintained outside the agent workspace. Do not give the reference source or reference commit metadata to the coding agent."
+  ],
+  "validation": {
+    "status": "baseline_failed_reference_passed",
+    "verified_on": "2026-10-23",
+    "execution": "Local Python subprocesses importing complete GitHub-fetched statsutils.py; no Docker run performed by this agent",
+    "python_version": "3.14.7",
+    "platform": "Windows",
+    "baseline": {
+      "exit_code": 1,
+      "passed": 11,
+      "failed": 5,
+      "failure": "ZeroDivisionError at all five exact boundary cases"
+    },
+    "reference": {
+      "exit_code": 0,
+      "passed": 16,
+      "failed": 0
+    },
+    "oracle_sha256": "814aff63da83744cbe86f4af52fc1aba0d20707fad0fc6539a6a3bbe38326ef4",
+    "source_blob_hashes_recomputed": true
+  },
+  "parent_sha": "3913220988e1e7c80620796fdcb4f74eb598d179",
+  "fix_sha": "73e22c90de25aaae3e6aed57f7438ffe57349339"
+}

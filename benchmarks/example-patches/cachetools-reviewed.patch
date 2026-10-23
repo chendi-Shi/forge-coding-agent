@@ -1,0 +1,177 @@
+diff --git a/src/cachetools/_descriptor.py b/src/cachetools/_descriptor.py
+index e85d8fc..c6102c7 100644
+--- a/src/cachetools/_descriptor.py
++++ b/src/cachetools/_descriptor.py
+@@ -3,6 +3,7 @@
+ __all__ = ()
+ 
+ import functools
++import types
+ import warnings
+ 
+ 
+@@ -98,12 +99,13 @@ class _MethodDescriptor:
+         if self.__unbound is None:
+             descriptor = self
+ 
+-            # As in the previous function wrapper, the receiver is named self.
++            # A real bound method lets autospec omit the wrapped receiver
++            # without making the descriptor impersonate a function.
+             @functools.wraps(self.__wrapped__)  # type: ignore
+-            def unbound(self, *args, **kwargs):
++            def unbound(_descriptor, self, *args, **kwargs):
+                 return descriptor.__get__(self)(*args, **kwargs)
+ 
+-            self.__unbound = unbound  # type: ignore
++            self.__unbound = types.MethodType(unbound, self)  # type: ignore
+         return self.__unbound
+ 
+ 
+diff --git a/tests/test_cachedmethod_autospec.py b/tests/test_cachedmethod_autospec.py
+new file mode 100644
+index 0000000..7ff8f68
+--- /dev/null
++++ b/tests/test_cachedmethod_autospec.py
+@@ -0,0 +1,73 @@
++import unittest
++from threading import Condition, RLock
++from unittest import mock
++
++from cachetools import cachedmethod
++
++
++class CachedMethodAutospecTest(unittest.TestCase):
++    def services(self):
++        for info in (False, True):
++            for mode in ('unlocked', 'locked', 'condition'):
++                options = {'info': info}
++                if mode == 'locked':
++                    options['lock'] = lambda self: self.lock
++                elif mode == 'condition':
++                    options['condition'] = lambda self: self.condition
++
++                class Service:
++                    def __init__(self):
++                        self.cache = {}
++                        self.calls = 0
++                        self.lock = RLock()
++                        self.condition = Condition(self.lock)
++
++                    def plain(self, key):
++                        return key
++
++                    @cachedmethod(lambda self: self.cache, **options)
++                    def cached(self, key):
++                        self.calls += 1
++                        return key
++
++                class Child(Service):
++                    pass
++
++                for cls in (Service, Child):
++                    yield info, mode, cls
++
++    def test_autospec_signature(self):
++        for info, mode, cls in self.services():
++            for instance in (False, True):
++                with self.subTest(info=info, mode=mode, cls=cls, instance=instance):
++                    service = mock.create_autospec(cls, instance=instance)
++                    if not instance:
++                        service = service.return_value
++                    for method in (service.plain, service.cached):
++                        method('key')
++                        method.assert_called_once_with('key')
++                        method(key='other')
++                        method.assert_called_with(key='other')
++                        with self.assertRaises(TypeError):
++                            method()
++                        with self.assertRaises(TypeError):
++                            method('one', 'two')
++                        with self.assertRaises(TypeError):
++                            method(unexpected='key')
++
++    def test_real_instance_and_class_access(self):
++        for info, mode, cls in self.services():
++            with self.subTest(info=info, mode=mode, cls=cls):
++                service = cls()
++                self.assertEqual(cls.cached(service, 'key'), 'key')
++                self.assertEqual(service.cached('key'), 'key')
++                self.assertEqual(service.calls, 1)
++                self.assertEqual(cls.cached(self=service, key='other'), 'other')
++                self.assertEqual(service.cached(key='other'), 'other')
++                self.assertEqual(service.calls, 2)
++                if info:
++                    self.assertEqual(service.cached.cache_info().hits, 2)
++                    self.assertEqual(service.cached.cache_info().misses, 2)
++                service.cached.cache_clear()
++                self.assertEqual(service.cached('key'), 'key')
++                self.assertEqual(service.calls, 3)
+diff --git a/tests/test_cachedmethod_descriptor_inspection.py b/tests/test_cachedmethod_descriptor_inspection.py
+new file mode 100644
+index 0000000..d0f3042
+--- /dev/null
++++ b/tests/test_cachedmethod_descriptor_inspection.py
+@@ -0,0 +1,63 @@
++import inspect
++from threading import Condition, RLock
++from unittest import mock
++
++import pytest
++
++from cachetools import cachedmethod
++
++
++@pytest.fixture(params=[(info, mode) for info in (False, True)
++                        for mode in ('unlocked', 'locked', 'condition')])
++def service_class(request):
++    info, mode = request.param
++    options = {'info': info}
++    if mode == 'locked':
++        options['lock'] = lambda self: self.lock
++    elif mode == 'condition':
++        options['condition'] = lambda self: self.condition
++
++    class Service:
++        def __init__(self):
++            self.cache = {}
++            self.calls = 0
++            self.lock = RLock()
++            self.condition = Condition(self.lock)
++
++        @cachedmethod(lambda self: self.cache, **options)
++        def cached(self, key):
++            self.calls += 1
++            return key
++
++    return Service
++
++
++def test_raw_descriptor_autospec(service_class):
++    raw = inspect.getattr_static(service_class, 'cached')
++    assert mock.create_autospec(raw) is not None
++
++
++def test_raw_descriptor_is_not_coroutine(service_class):
++    raw = inspect.getattr_static(service_class, 'cached')
++    assert inspect.iscoroutinefunction(raw) is False
++
++
++def test_raw_descriptor_is_not_generator(service_class):
++    raw = inspect.getattr_static(service_class, 'cached')
++    assert inspect.isgeneratorfunction(raw) is False
++
++
++def test_inspection_preserves_cache_behavior(service_class):
++    raw = inspect.getattr_static(service_class, 'cached')
++    mock.create_autospec(raw)
++    inspect.iscoroutinefunction(raw)
++    inspect.isgeneratorfunction(raw)
++    service = service_class()
++    assert service_class.cached(service, 'key') == 'key'
++    assert service.calls == 1
++    # Default methodkey distinguishes positional and keyword arguments.
++    assert service.cached(key='key') == 'key'
++    assert service.calls == 2
++    assert service_class.cached(self=service, key='key') == 'key'
++    assert service.calls == 2
++    assert service.cache

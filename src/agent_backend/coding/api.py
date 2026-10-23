@@ -12,7 +12,7 @@ import zipfile
 from datetime import timedelta
 from typing import Literal
 from urllib.parse import quote, urlsplit
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 
 import httpx
 from aegra_api.core.orm import get_session
@@ -459,27 +459,54 @@ async def heartbeat(body: Heartbeat, owner=Depends(identity), session: AsyncSess
 
 @router.get("/tasks/{task_id}/source")
 async def source(task_id: UUID, x_lease_token: str = Header(default=""), owner=Depends(identity), session: AsyncSession = Depends(get_session)):
-    # Hold the task row through initial fork + seed restore. A retried source
-    # request must never restore stale seed files over an accepted artifact.
+    def check_source():
+        leased(task, x_lease_token)
+        if task.status != "running" or task.cancel_requested:
+            raise HTTPException(409, "Source requires a running task without cancellation")
+        if task.workspace_ready and task.test_command and task.baseline_test is None:
+            # Older deployments could publish readiness before recording the
+            # baseline. The task or its failed parent may since have changed.
+            raise HTTPException(409, "Initial baseline unavailable for this existing workspace; create a follow-up instead of reconstructing it from modified files")
+
     task = await owned(session, Task, task_id, owner, lock=True)
-    leased(task, x_lease_token)
-    if task.status != "running":
-        raise HTTPException(409, "Source is only available while the coding engine is running")
+    check_source()
     if not task.workspace_ready:
         task.lease_expires_at = max(task.lease_expires_at, now() + timedelta(seconds=360))
-        await broker("POST", f"/workspaces/{task.source_workspace_id}/fork", json={"workspace_id": task.id})
-        if task.seed_workspace_id:
-            previous = await broker("GET", f"/workspaces/{task.seed_workspace_id}/archive", raw=True)
-            await broker("POST", f"/workspaces/{task.id}/restore", json={"archive_base64": base64.b64encode(previous).decode()})
-        task.workspace_ready = True
-        await session.commit()
-        if task.test_command:
-            baseline = await verify_workspace(task.id, task.test_command)
-            task.baseline_test = baseline
-            await record(session, task.id, "test.baseline", baseline)
-            await session.commit()
-    else:
-        await session.commit()
+    await session.commit()  # Release the row so heartbeat/cancel remain available.
+    if not task.workspace_ready:
+        # Only source requests use this transaction-level lock. No commits or
+        # Task writes occur during external I/O, so heartbeats do not wait for
+        # a test command while concurrent source retries remain serialized.
+        await session.execute(text("SELECT pg_advisory_xact_lock(82515, hashtext(:task_id))"), {"task_id": task.id})
+        await session.refresh(task)
+        check_source()
+        if not task.workspace_ready:
+            # A failed parent can resume and mutate its workspace. Freeze its
+            # initial content once, using an idempotent, task-derived identity.
+            initial_id = str(uuid5(UUID(task.id), "coding-initial-workspace-v1"))
+            try:
+                initial = await broker("GET", f"/workspaces/{initial_id}/archive", raw=True)
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+                initial_source = task.seed_workspace_id or task.source_workspace_id
+                await broker("POST", f"/workspaces/{initial_source}/fork", json={"workspace_id": initial_id})
+                initial = await broker("GET", f"/workspaces/{initial_id}/archive", raw=True)
+            # An archive can exist on a partially initialized volume. Require
+            # its committed Git baseline before treating these bytes as initial.
+            await broker("POST", f"/workspaces/{initial_id}/tools", json={"name": "get_diff", "arguments": {"max_output": 1}})
+            await broker("POST", f"/workspaces/{task.source_workspace_id}/fork", json={"workspace_id": task.id})
+            await broker("POST", f"/workspaces/{task.id}/restore", json={"archive_base64": base64.b64encode(initial).decode()})
+            baseline = await verify_workspace(initial_id, task.test_command) if task.test_command else None
+            # Never publish a workspace before its baseline result is durable,
+            # or let a cancelled/expired/replaced lease publish late results.
+            with session.no_autoflush:
+                await session.refresh(task, with_for_update=True)
+            check_source()
+            task.baseline_test, task.workspace_ready = baseline, True
+            if baseline is not None:
+                await record(session, task.id, "test.baseline", baseline)
+        await session.commit()  # Also releases the source advisory lock.
     data = await broker("GET", f"/workspaces/{task.id}/archive", raw=True)
     return Response(data, media_type="application/zip")
 
@@ -521,32 +548,39 @@ async def complete(task_id: UUID, body: Completion, owner=Depends(identity), ses
     task.status, task.summary, task.session_id, task.usage = "verifying", body.summary, body.session_id, body.usage
     task.lease_expires_at = now() + timedelta(seconds=360)
     await session.commit()
+    changes = verification = failure = None
     try:
         if task.workspace_ready and (body.archive_base64 or task.engine == "forge"):
             if body.archive_base64 and task.engine != "forge":
                 await broker("POST", f"/workspaces/{task.id}/restore", json={"archive_base64": body.archive_base64})
             changes = await broker("GET", f"/workspaces/{task.id}/diff")
-            task.diff = changes.get("diff", "")
-            if changes.get("truncated"):
-                await record(session, task.id, "artifact.truncated", {"message": "Diff exceeded preview limit. Download the workspace archive."})
         elif body.exit_code == 0:
             raise HTTPException(422, "Successful completion requires a workspace archive")
-        await session.commit()
         if body.exit_code == 0 and task.test_command:
             await record(session, task.id, "test.started", {"command": task.test_command, "environment": "isolated Docker; network disabled"})
             await session.commit()
-            task.verification = await verify_workspace(task.id, task.test_command)
-            await record(session, task.id, "test.completed", task.verification)
-        await session.refresh(task, attribute_names=["cancel_requested", "status"])
-        if task.status != "verifying":
-            await session.commit()
-            return public(task)
-        task.status = "cancelled" if task.cancel_requested else ("awaiting_review" if body.exit_code == 0 else "failed")
-        task.error = body.error
-        if body.exit_code and not task.error:
-            task.error = f"Coding engine exited with code {body.exit_code}"
+            verification = await verify_workspace(task.id, task.test_command)
     except HTTPException as exc:
-        task.status, task.error = "failed", str(exc.detail)
+        failure = str(exc.detail)
+    # Keep external results out of the identity map until the control fields
+    # have been reloaded under a row lock. This covers error exits as well as
+    # success, and prevents old completion requests overwriting a new lease.
+    with session.no_autoflush:
+        await session.refresh(task, with_for_update=True)
+    if task.status != "verifying":
+        await session.commit()
+        return public(task)
+    leased(task, body.lease_token)
+    if changes is not None:
+        task.diff = changes.get("diff", "")
+        if changes.get("truncated"):
+            await record(session, task.id, "artifact.truncated", {"message": "Diff exceeded preview limit. Download the workspace archive."})
+    if verification is not None:
+        task.verification = verification
+        await record(session, task.id, "test.completed", verification)
+    task.status = "cancelled" if task.cancel_requested else ("failed" if failure or body.exit_code else "awaiting_review")
+    task.error = failure or body.error or (f"Coding engine exited with code {body.exit_code}" if body.exit_code else None)
+    if failure:
         await record(session, task.id, "verification.error", {"message": task.error})
     task.finished_at = now()
     await record(session, task.id, "task.finished", {"status": task.status, "has_diff": bool(task.diff), "error": task.error})

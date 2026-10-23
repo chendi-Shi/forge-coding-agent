@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "task_id": "acf14d68-a1e6-4594-a95d-b803c93f989c",
+  "real_model_calls": 0,
+  "scripted_decisions": 2,
+  "fault": "lost_ack_after_committed_edit_before_observation_checkpoint",
+  "cached_calls": [
+    false,
+    true,
+    false
+  ],
+  "durable_tool_operations": 2,
+  "verification_exit_code": 0
+}

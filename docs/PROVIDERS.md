@@ -78,7 +78,7 @@ result = await provider.decide(messages, decision_schema)
 | `missing_api_key` / `missing_model` / `invalid_configuration` / `cli_not_found` | 配置未就绪 |
 | `invalid_request` / `request_too_large` / `invalid_schema` / `external_schema_reference` | 输入或 schema 无效 |
 | `authentication` / `http_rejected` | 上游拒绝请求，不自动重试 |
-| `rate_limit` / `upstream_unavailable` / `transport` / `timeout` | 可由运行时按预算重试 |
+| `rate_limit` / `upstream_unavailable` / `transport` / `timeout` | 带可重试分类；当前 worker 记录失败，可在满足恢复条件后显式 resume，尚未实现自动退避重试 |
 | `invalid_response` / `invalid_decision` / `schema_validation` / `invalid_transcript` | 输出未通过协议校验 |
 | `tool_activity_rejected` / `refused` / `output_limit` | 工具活动、拒答或输出超过限制 |
 | `cli_failed` / `cli_transport` / `process_isolation` | CLI 或进程管理失败 |

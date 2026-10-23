@@ -69,6 +69,28 @@ cachetools 的首次补丁通过给 `_MethodDescriptor.__class__` 返回 `types.
 
 操作日志不能提供跨 PostgreSQL/Docker 的 exactly-once。若外部副作用已开始却没有结果记录，系统拒绝自动重放；协作式取消也不能瞬时回滚已运行命令。详见 [架构与故障窗口](ARCHITECTURE.md)。
 
+## 本轮生命周期缺陷与修复前后对照
+
+审查发现两个此前没有充分覆盖的缺陷：工作区先标记 ready、后保存基线，中断后可能漏掉修改前证据；完成接口最终读取状态未加行锁，可能忽略并发取消或让旧租约结果覆盖新任务运行。此次修复引入冻结初始快照、独立初始化锁，以及完成前的加锁刷新与租约复核。半初始化快照明确拒绝，不根据后来变动的源码重建“修改前”状态。
+
+同一个 `scripts/check_coding_lifecycle.py` 分别加载初始发布提交 `5a2fefb3da9ada9c6aec8669209425730498da53` 和修复后的 API 源码，在真实 PostgreSQL 的独立会话中控制并发顺序：
+
+| 检查 | 修复前 | 修复后 |
+|---|---|---|
+| 基线中断后重试 | ready 已提交，基线缺失 | 保持未就绪，从冻结初始内容重试 |
+| 初始化外部操作期间的心跳 | PostgreSQL 行锁等待 | 心跳可提交 |
+| 历史 ready 任务缺少基线 | 返回工作区，缺失未提示 | 409，拒绝伪造基线 |
+| 完成读取最终状态后，取消同时到达 | 取消已提交，最终仍为 awaiting_review 且标志矛盾 | 取消真实等待行锁；按事务先后决定终态 |
+| 验证异常发生前已提交取消 | 异常分支覆盖成 failed | 保留 cancelled |
+
+结果为修复前 **0/5**、修复后 **5/5**。可公开复核的原始报告：[修复前](evidence/coding-lifecycle-before.json)、[修复后](evidence/coding-lifecycle-after.json)，均包含 API 源码 SHA-256；`api_source_ref` 由运行时解析的提交或 WORKTREE 标识，哈希限定实际受测内容。
+
+这些探针使用**真实数据库、真实 API 函数和可控 broker/验证替身**，通过 PostgreSQL 锁等待确认竞争顺序；不是完整 HTTP/Docker 测试，也没有杀 worker 进程，模型调用为 0。每次只清理自己新建的 UUID / owner 范围数据。单元回归另外覆盖旧租约迟到完成、取消发生在基线期间、已有修改的恢复、原 seed 消失和不完整快照拒绝。源码与测试见 [生命周期回归](../tests/test_coding_lifecycle.py)。
+
+修复部署后，另外复跑真实 HTTP/PostgreSQL/Docker 的 [完整流程检查](evidence/coding-flow-after.json) 和 [AgentRuntime 丢应答恢复](evidence/forge-recovery-after.json)，全部通过；后者仍为 `[false, true, false]` 的工具结果复用、2 条持久操作、最终验收 exit 0。两项均为脚本决策、0 模型调用。两个 API 副本的已安装源码 SHA-256 均与修复后探针报告一致：`cae2f103eb28f8f47d6c1741c248fe6b0e7ac3956a4081d8fac35f4c9ba50d45`。
+
+冻结快照增加了持久卷占用，尚无完整的保留期限与垃圾回收策略；最终状态一致也不代表已运行的容器会立即终止。通用任务测试防篡改、提示注入和跨机器产物恢复等剩余边界列于 [面试讨论](INTERVIEW.md)。
+
 ## 100 任务队列实测
 
 单个 localhost 突发批次，使用独立 isolation-test 身份：101 个并发提交，100 个入队，第 101 个 HTTP429；20 个脚本执行器以每个 5 槽领取，得到 **100 个唯一租约**。之后全部取消。未启动 100 个模型进程。
@@ -94,7 +116,7 @@ cachetools 的首次补丁通过给 `_MethodDescriptor.__class__` 返回 `types.
 
 ## 自动化与界面
 
-- 最终 Python 自动化：**245 passed、2 skipped、9 subtests passed**。跳过项为真实 provider 的 opt-in 调用、Windows 符号链接权限；实际模型任务和 Linux 沙箱另有独立证据。
+- 最终 Python 自动化：**256 passed、2 skipped、9 subtests passed**；本轮增加 11 项生命周期回归。跳过项为真实 provider 的 opt-in 调用、Windows 符号链接权限；实际模型任务和 Linux 沙箱另有独立证据。
 - Ruff `check .` 通过；冻结的上游参考源文件保留原字节，不参与本项目格式检查。
 - Studio 已部署资源 + 真实只读 API 最终验收 **24/24**，JS/console 错误 0，报告 `results/studio-deployed-final/studio-check.json`。覆盖桌面、390px 手机、真实 Forge diff/测试/检查点/工具记录；隔离 mock 另测创建 engine、resume、不确定操作禁用和请求竞态，不冒充真实服务写入测试。
 - 沙箱原实机检查 14/14 通过，详见 [底层沙箱与旧 CLI 记录](CODEX_BASELINE_VALIDATION.md)。

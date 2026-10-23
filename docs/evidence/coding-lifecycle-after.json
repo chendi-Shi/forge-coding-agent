@@ -1,0 +1,54 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "name": "source_baseline_interrupt_and_frozen_retry",
+      "passed": true,
+      "ready_after_interruption": false,
+      "retry_baseline": "seed-before",
+      "first_baseline_observation": [
+        "seed-before"
+      ],
+      "original_seed_missing_on_retry": true
+    },
+    {
+      "name": "source_external_io_does_not_block_heartbeat",
+      "passed": true,
+      "heartbeat_during_fork": "committed"
+    },
+    {
+      "name": "legacy_ready_without_baseline_is_not_relabelled",
+      "passed": true,
+      "status_code": 409
+    },
+    {
+      "name": "complete_final_refresh_serializes_cancel",
+      "passed": true,
+      "cancel_after_final_refresh": "postgres_lock_wait",
+      "final": {
+        "status": "awaiting_review",
+        "cancel_requested": false,
+        "workspace_ready": true,
+        "baseline_test": null
+      }
+    },
+    {
+      "name": "verification_error_cannot_overwrite_cancel",
+      "passed": true,
+      "final": {
+        "status": "cancelled",
+        "cancel_requested": true,
+        "workspace_ready": true,
+        "baseline_test": null
+      }
+    }
+  ],
+  "evidence_type": "real_postgresql_api_functions_with_controlled_broker_and_verification_barriers",
+  "http_test": false,
+  "real_docker_tool_execution": false,
+  "worker_killed": false,
+  "real_model_calls": 0,
+  "synthetic_rows_cleaned": true,
+  "api_source_ref": "WORKTREE",
+  "api_source_sha256": "cae2f103eb28f8f47d6c1741c248fe6b0e7ac3956a4081d8fac35f4c9ba50d45"
+}

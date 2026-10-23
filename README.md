@@ -36,9 +36,11 @@
 
 两个候选都保留原测试，新增回归测试；隐藏测试与参考修复没有提供给 Agent。**这是两题历史 bug pilot，存在训练数据污染可能，不能当作 SWE-bench 或普遍成功率。** cachetools 首次候选被审查发现 introspection 回归，已拒绝。后续两次尝试预算耗尽；第四次任务在明确反馈和一次部署中断恢复后完成，最终 **87 passed + 36 subtests，兼容性复审 3 passed**。全部失败与消耗保留，不能把这条修复链写成首次自动成功。
 
-本项目自动化 **245 passed、2 skipped**；已部署 Studio **24/24**，JS/console 错误 0。可审阅 [实测摘要与报告哈希](benchmarks/forge-run-summary.json)、[最终 cachetools 补丁](benchmarks/example-patches/cachetools-reviewed.patch) 和 [boltons 补丁](benchmarks/example-patches/boltons-first.patch)。
+本项目自动化 **256 passed、2 skipped**；已部署 Studio **24/24**，JS/console 错误 0。可审阅 [实测摘要与报告哈希](benchmarks/forge-run-summary.json)、[最终 cachetools 补丁](benchmarks/example-patches/cachetools-reviewed.patch) 和 [boltons 补丁](benchmarks/example-patches/boltons-first.patch)。
 
 控制层实测：101 个同时提交、100 个入队、1 个 429、100 个唯一租约；真实故障注入验证丢失响应后复用已完成修改，未重复执行副作用。上述控制检查使用脚本，不消耗模型调用。检索消融在固定小型合成集上，hybrid 与纯 lexical 同分，不能声称 hybrid 优于 BM25。详见 [验证记录](docs/VALIDATION.md) 与 [评测来源](benchmarks/BENCHMARKS.md)。
+
+[10 个 bad case 与面试追问](docs/INTERVIEW.md) 记录现象、根因、修复、验证及未解决边界。最新生命周期修复在同一真实 PostgreSQL 探针下由 **0/5 变为 5/5**，覆盖基线中断、心跳阻塞与完成/取消竞态；broker 使用可控替身，证据范围见 [前后对照](docs/VALIDATION.md#本轮生命周期缺陷与修复前后对照)。
 
 ## 启动与配置
 
@@ -83,6 +85,8 @@ FORGE_TOKEN_PARAMETER=max_completion_tokens
 .venv\Scripts\ruff.exe check .
 .venv\Scripts\python.exe scripts/check_forge_control.py
 .venv\Scripts\python.exe scripts/check_forge_recovery.py
+.venv\Scripts\python.exe scripts/check_coding_flow.py
+.venv\Scripts\python.exe scripts/check_coding_lifecycle.py --api-ref WORKTREE --report results/coding-lifecycle-after.json
 .venv\Scripts\python.exe scripts/check_coding_queue.py
 .venv\Scripts\python.exe scripts/evaluate_retrieval.py
 .venv\Scripts\python.exe scripts/prepare_issue_benchmarks.py verify
